@@ -1,0 +1,41 @@
+{
+  "name": "olxsortd",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Email contact management and cold outreach tool for Outlook and Gmail",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "build:outlook": "npm run build && npm run build:outlook-manifest",
+    "build:gmail": "npm run build && npm run build:gmail-manifest",
+    "build:outlook-manifest": "node scripts/build-outlook-manifest.js",
+    "build:gmail-manifest": "node scripts/build-gmail-manifest.js",
+    "lint": "eslint .",
+    "preview": "vite preview",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "quill": "^1.3.7",
+    "react-quill": "^2.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.36.0",
+    "@types/node": "^24.6.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@vitejs/plugin-react": "^5.0.4",
+    "autoprefixer": "^10.4.17",
+    "eslint": "^9.36.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.22",
+    "globals": "^16.4.0",
+    "postcss": "^8.4.35",
+    "tailwindcss": "^3.4.1",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.45.0",
+    "vite": "^7.1.7"
+  }
+}
