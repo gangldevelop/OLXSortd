@@ -35,7 +35,7 @@ export class ProgressTracker {
     this.completedStages = 0;
     this.currentStage = initialStage;
     
-    this.updateProgress(0, `Starting ${initialStage}...`, 0, 0);
+    this.updateProgress(0, `Starting ${initialStage}...`, 0, 0, 0);
   }
 
   /**
