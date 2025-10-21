@@ -3,11 +3,13 @@ import { ContactList } from './components/ContactList';
 import { Authentication } from './components/Authentication';
 import { EmailTemplateSelector } from './components/EmailTemplateSelector';
 import { EmailEditor } from './components/EmailEditor';
-import { ContactAnalysisService } from './services/contactAnalysisService';
+import { ProgressBar } from './components/ProgressBar';
+import { BatchedContactAnalysis } from './services/batchedContactAnalysis';
 import { graphService } from './services/microsoftGraphService';
 import { getTemplateByCategory } from './data/emailTemplates';
 import type { ContactWithAnalysis } from './types/contact';
 import type { EmailTemplate } from './types/email';
+import type { ProgressUpdate } from './services/progressTracker';
 
 // Compact Analysis Summary Component
 function AnalysisSummary({ contacts, onCategoryClick, onDraftEmail }: { 
@@ -19,6 +21,8 @@ function AnalysisSummary({ contacts, onCategoryClick, onDraftEmail }: {
     total: contacts.length,
     frequent: contacts.filter(c => c.category === 'frequent').length,
     inactive: contacts.filter(c => c.category === 'inactive').length,
+    warm: contacts.filter(c => c.category === 'warm').length,
+    hot: contacts.filter(c => c.category === 'hot').length,
     cold: contacts.filter(c => c.category === 'cold').length,
   };
 
@@ -41,7 +45,7 @@ function AnalysisSummary({ contacts, onCategoryClick, onDraftEmail }: {
           {/* Quick Stats */}
           <div className="bg-white rounded border p-3">
             <h3 className="text-sm font-semibold text-gray-900 mb-2">Analysis Summary</h3>
-            <div className="grid grid-cols-4 gap-2 text-center">
+            <div className="grid grid-cols-3 gap-2 text-center">
               <button 
                 onClick={() => onCategoryClick(null)}
                 className="p-2 rounded hover:bg-gray-50 transition-colors cursor-pointer"
@@ -65,6 +69,24 @@ function AnalysisSummary({ contacts, onCategoryClick, onDraftEmail }: {
               >
                 <div className="text-lg font-bold text-orange-600">{summary.inactive}</div>
                 <div className="text-xs text-gray-500">Inactive</div>
+              </button>
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-center mt-2">
+              <button 
+                onClick={() => onCategoryClick('warm')}
+                className="p-2 rounded hover:bg-yellow-50 transition-colors cursor-pointer"
+                title="Show warm contacts"
+              >
+                <div className="text-lg font-bold text-yellow-600">{summary.warm}</div>
+                <div className="text-xs text-gray-500">Warm</div>
+              </button>
+              <button 
+                onClick={() => onCategoryClick('hot')}
+                className="p-2 rounded hover:bg-red-50 transition-colors cursor-pointer"
+                title="Show hot contacts"
+              >
+                <div className="text-lg font-bold text-red-600">{summary.hot}</div>
+                <div className="text-xs text-gray-500">Hot</div>
               </button>
               <button 
                 onClick={() => onCategoryClick('cold')}
@@ -91,10 +113,12 @@ function AnalysisSummary({ contacts, onCategoryClick, onDraftEmail }: {
                     return 'bg-green-100 text-green-800 border-green-200';
                   case 'inactive':
                     return 'bg-orange-100 text-orange-800 border-orange-200';
-                  case 'cold':
-                    return 'bg-gray-100 text-gray-800 border-gray-200';
                   case 'warm':
                     return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+                  case 'hot':
+                    return 'bg-red-100 text-red-800 border-red-200';
+                  case 'cold':
+                    return 'bg-gray-100 text-gray-800 border-gray-200';
                   default:
                     return 'bg-gray-100 text-gray-800 border-gray-200';
                 }
@@ -106,10 +130,12 @@ function AnalysisSummary({ contacts, onCategoryClick, onDraftEmail }: {
                     return '🔥';
                   case 'inactive':
                     return '⏰';
-                  case 'cold':
-                    return '❄️';
                   case 'warm':
                     return '🌡️';
+                  case 'hot':
+                    return '🔥';
+                  case 'cold':
+                    return '❄️';
                   default:
                     return '❓';
                 }
@@ -166,8 +192,9 @@ function App() {
   const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate | null>(null);
   const [showEditor, setShowEditor] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [progress, setProgress] = useState<ProgressUpdate | null>(null);
   
-  const analysisService = new ContactAnalysisService();
+  const batchedAnalysis = new BatchedContactAnalysis();
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -182,7 +209,14 @@ function App() {
 
   const handleDraftEmail = (contact: ContactWithAnalysis) => {
     setSelectedContact(contact);
-    const template = getTemplateByCategory(contact.category === 'warm' || contact.category === 'hot' ? 'cold' : contact.category);
+    // Map warm/hot categories to appropriate templates
+    let templateCategory: 'frequent' | 'inactive' | 'cold';
+    if (contact.category === 'warm' || contact.category === 'hot') {
+      templateCategory = 'cold'; // Use warm/hot templates
+    } else {
+      templateCategory = contact.category as 'frequent' | 'inactive' | 'cold';
+    }
+    const template = getTemplateByCategory(templateCategory);
     setSelectedTemplate(template || null);
     setShowEditor(false);
   };
@@ -243,6 +277,7 @@ function App() {
   const analyzeContacts = async (mode: 'quick' | 'balanced' | 'comprehensive' = 'balanced') => {
     setIsAnalyzing(true);
     setSelectedCategory(null); // Reset category filter when analyzing
+    setProgress(null);
     
     try {
       console.log(`Fetching real data from Microsoft Graph (${mode} mode)...`);
@@ -269,24 +304,44 @@ function App() {
           break;
         case 'comprehensive':
           analysisOptions = { useAllEmails: true, maxEmails: 50000 };
-          emailInteractionLimit = 10000;
+          emailInteractionLimit = 50000; // Much larger limit for comprehensive mode
           break;
         default: // balanced
           analysisOptions = {};
-          emailInteractionLimit = 200;
+          emailInteractionLimit = 2000; // Increased from 200
       }
       
       // Get real contacts and email interactions from Graph API
+      console.log('Fetching contacts and email interactions...');
+      
       const [realContacts, realEmailInteractions] = await Promise.all([
         graphService.getContactsForAnalysis(analysisOptions),
         graphService.getEmailInteractionsForAnalysis(emailInteractionLimit)
       ]);
+
+      console.log('Data fetch complete, starting analysis...');
       
       console.log(`Analyzing ${realContacts.length} contacts with ${realEmailInteractions.length} email interactions`);
       
-      const analyzedContacts = analysisService.analyzeContacts(
+      // Use batched analysis for better performance with large datasets
+      const analyzedContacts = await batchedAnalysis.analyzeContactsInBatches(
         realContacts,
-        realEmailInteractions
+        realEmailInteractions,
+        {
+          batchSize: batchedAnalysis.getRecommendedBatchSize(realContacts.length),
+          maxConcurrentBatches: 3,
+          onProgress: (update) => {
+            console.log('App: Received progress update:', update);
+            setProgress(update);
+          },
+          onComplete: () => {
+            console.log('Batched analysis completed successfully');
+          },
+          onError: (error) => {
+            console.error('Batched analysis failed:', error);
+            throw error;
+          }
+        }
       );
       
       setContacts(analyzedContacts);
@@ -297,6 +352,7 @@ function App() {
       alert(`Failed to load your contacts and emails: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsAnalyzing(false);
+      setProgress(null);
     }
   };
 
@@ -311,16 +367,13 @@ function App() {
     );
   }
 
-  if (isAnalyzing) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Analyzing your contacts...</p>
-        </div>
-      </div>
-    );
-  }
+      if (isAnalyzing) {
+        return (
+          <div className="min-h-screen bg-gray-50">
+            <ProgressBar progress={progress} isVisible={isAnalyzing} />
+          </div>
+        );
+      }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -338,6 +391,7 @@ function App() {
                   onClick={() => analyzeContacts('quick')}
                   className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded transition-colors"
                   disabled={isAnalyzing}
+                  title="Quick analysis (~30s) - Recent contacts only"
                 >
                   {isAnalyzing ? 'Analyzing...' : 'Quick'}
                 </button>
@@ -345,6 +399,7 @@ function App() {
                   onClick={() => analyzeContacts('balanced')}
                   className="text-xs bg-primary-600 hover:bg-primary-700 text-white px-3 py-1 rounded transition-colors"
                   disabled={isAnalyzing}
+                  title="Balanced analysis (~2-5min) - Good coverage"
                 >
                   {isAnalyzing ? 'Analyzing...' : 'Analyze'}
                 </button>
@@ -352,6 +407,7 @@ function App() {
                   onClick={() => analyzeContacts('comprehensive')}
                   className="text-xs bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded transition-colors"
                   disabled={isAnalyzing}
+                  title="Comprehensive analysis (~5-15min) - All contacts"
                 >
                   {isAnalyzing ? 'Analyzing...' : 'All'}
                 </button>
@@ -403,7 +459,7 @@ function App() {
               {/* Email Template Selection */}
               {selectedContact && !showEditor && (
                 <EmailTemplateSelector
-                  selectedCategory={selectedContact.category === 'warm' || selectedContact.category === 'hot' ? 'cold' : selectedContact.category}
+                  selectedCategory={selectedContact.category === 'warm' || selectedContact.category === 'hot' ? 'cold' : selectedContact.category as 'frequent' | 'inactive' | 'cold'}
                   onTemplateSelect={handleTemplateSelect}
                 />
               )}

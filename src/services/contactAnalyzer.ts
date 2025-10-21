@@ -118,6 +118,11 @@ export class ContactAnalyzer {
       return 'inactive';
     }
 
+    // Warm: Some communication but not meeting frequent criteria
+    if (metrics.totalEmails > 2 && metrics.responseRate > 0.3) {
+      return 'warm';
+    }
+
     // Cold: Minimal or no communication
     if (
       metrics.totalEmails <= this.config.cold.maxEmailsTotal &&
@@ -126,12 +131,16 @@ export class ContactAnalyzer {
       return 'cold';
     }
 
-    // Warm: Some communication but not meeting frequent criteria
-    if (metrics.totalEmails > 2 && metrics.responseRate > 0.3) {
-      return 'warm';
+    // Hot: High engagement but not recent enough for frequent
+    if (metrics.totalEmails > 5 && metrics.responseRate > 0.7 && metrics.daysSinceLastContact <= 30) {
+      return 'hot';
     }
 
-    // Default to cold for new/unclear contacts
+    // Default based on email count and response rate
+    if (metrics.totalEmails > 2) {
+      return 'warm';
+    }
+    
     return 'cold';
   }
 
@@ -208,18 +217,22 @@ export class ContactAnalyzer {
   }
 
   /**
-   * Calculates response rate from email interactions
+   * Calculates response rate from email interactions with improved logic
    */
   private calculateResponseRate(interactions: EmailInteraction[]): number {
     const sentEmails = interactions.filter(i => i.direction === 'sent');
     if (sentEmails.length === 0) return 0;
 
     const repliedEmails = sentEmails.filter(email => {
-      // Look for replies within 7 days
+      // Look for replies within 14 days (more realistic for business emails)
       const replies = interactions.filter(i => 
         i.direction === 'received' && 
         i.date > email.date && 
-        i.date.getTime() - email.date.getTime() < 7 * 24 * 60 * 60 * 1000
+        i.date.getTime() - email.date.getTime() < 14 * 24 * 60 * 60 * 1000 &&
+        // Check if it's likely a reply (same subject or thread)
+        (i.subject.toLowerCase().includes('re:') || 
+         i.subject.toLowerCase().includes(email.subject.toLowerCase().replace('re:', '').trim()) ||
+         i.threadId === email.threadId)
       );
       return replies.length > 0;
     });

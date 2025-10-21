@@ -36,6 +36,40 @@ Best regards,
     variables: ['name', 'company', 'senderName']
   },
   {
+    id: 'warm-follow-up',
+    name: 'Warm Follow-up',
+    subject: 'Following up on our conversation',
+    body: `Hi {{name}},
+
+I hope you're doing well! I wanted to follow up on our previous conversation about {{topic}}.
+
+I've been thinking about what we discussed and wanted to see if you'd be interested in exploring this further.
+
+Would you be available for a quick call this week to discuss next steps?
+
+Best regards,
+{{senderName}}`,
+    category: 'cold', // Maps to cold since warm/hot use cold templates
+    variables: ['name', 'topic', 'senderName']
+  },
+  {
+    id: 'hot-opportunity',
+    name: 'Hot Opportunity',
+    subject: 'Exciting opportunity - {{company}}',
+    body: `Hi {{name}},
+
+I hope this email finds you well! I've been thinking about our previous discussions and have an exciting opportunity that I think would be perfect for {{company}}.
+
+Given your expertise in {{industry}}, I believe this could be a great fit.
+
+Would you be interested in a brief call to discuss this opportunity?
+
+Best regards,
+{{senderName}}`,
+    category: 'cold', // Maps to cold since warm/hot use cold templates
+    variables: ['name', 'company', 'industry', 'senderName']
+  },
+  {
     id: 'cold-outreach',
     name: 'Cold Outreach',
     subject: 'Quick question about {{company}}',

@@ -263,8 +263,12 @@ export class MicrosoftGraphService {
 
   /**
    * Smart contact extraction - get unique contacts from email history efficiently
+   * Optimized for large-scale processing with progress tracking
    */
-  async getSmartContacts(maxEmails: number = 5000): Promise<Array<{ id: string; name: string; email: string; lastContactDate: Date | null }>> {
+  async getSmartContacts(
+    maxEmails: number = 5000,
+    onProgress?: (stage: string, processed: number, total: number, message: string) => void
+  ): Promise<Array<{ id: string; name: string; email: string; lastContactDate: Date | null }>> {
     try {
       const currentUser = await this.getCurrentUser();
       const userEmail = currentUser.mail;
@@ -282,13 +286,16 @@ export class MicrosoftGraphService {
       
       // Fetch emails from different periods to get diverse contacts
       const periods = [0, 30, 90, 180, 365, 730]; // Last 2 years with sampling
+      const totalPeriods = periods.length;
       
-      for (const daysBack of periods) {
+      for (let i = 0; i < periods.length; i++) {
+        const daysBack = periods[i];
         const cutoffDate = new Date();
         cutoffDate.setDate(cutoffDate.getDate() - daysBack);
         const cutoffDateStr = cutoffDate.toISOString();
         
         console.log(`Fetching emails from ${daysBack} days ago...`);
+        onProgress?.('fetching_emails', i, totalPeriods, `Fetching emails from ${daysBack} days ago...`);
         
         // Get sent emails from this period
         const sentResponse = await this.makeGraphApiCall<{ value: EmailMessage[] }>(
@@ -347,6 +354,7 @@ export class MicrosoftGraphService {
         });
         
         console.log(`Found ${contactMap.size} unique contacts so far...`);
+        onProgress?.('processing_contacts', contactMap.size, maxEmails, `Found ${contactMap.size} unique contacts...`);
         
         // Stop if we have enough contacts or reached limit
         if (contactMap.size > maxEmails / 10) { // Rough estimate
@@ -542,6 +550,20 @@ export class MicrosoftGraphService {
   }
 
   /**
+   * Extract thread ID from email subject for better conversation grouping
+   */
+  private extractThreadId(subject: string): string {
+    // Remove common reply prefixes to get base subject
+    const baseSubject = subject
+      .replace(/^(re:|fwd?:|fw:)\s*/i, '')
+      .trim()
+      .toLowerCase();
+    
+    // Create a hash-like thread ID from the base subject
+    return baseSubject.replace(/[^a-z0-9]/g, '').substring(0, 20) || 'thread-' + Math.random().toString(36).substr(2, 9);
+  }
+
+  /**
    * Get email interactions for contact analysis - optimized for specific contacts
    */
   async getEmailInteractionsForAnalysis(limit: number = 200): Promise<Array<{
@@ -585,7 +607,7 @@ export class MicrosoftGraphService {
               direction: 'sent',
               isRead: true,
               isReplied: false,
-              threadId: email.id
+              threadId: this.extractThreadId(email.subject || '')
             });
           }
         });
@@ -603,7 +625,7 @@ export class MicrosoftGraphService {
             direction: 'received',
             isRead: email.isRead,
             isReplied: false,
-            threadId: email.id
+            threadId: this.extractThreadId(email.subject || '')
           });
         }
       });
