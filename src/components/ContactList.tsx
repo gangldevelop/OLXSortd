@@ -1,18 +1,11 @@
-import { useState } from 'react';
-import type { EmailTemplate } from '../types/email';
 import type { ContactWithAnalysis } from '../types/contact';
-import { EmailTemplateSelector } from './EmailTemplateSelector';
-import { EmailEditor } from './EmailEditor';
-import { getTemplateByCategory } from '../data/emailTemplates';
 
 interface ContactListProps {
   contacts: ContactWithAnalysis[];
+  onDraftEmail: (contact: ContactWithAnalysis) => void;
 }
 
-export function ContactList({ contacts }: ContactListProps) {
-  const [selectedContact, setSelectedContact] = useState<ContactWithAnalysis | null>(null);
-  const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate | null>(null);
-  const [showEditor, setShowEditor] = useState(false);
+export function ContactList({ contacts, onDraftEmail }: ContactListProps) {
 
   const getCategoryColor = (category: ContactWithAnalysis['category']) => {
     switch (category) {
@@ -27,46 +20,6 @@ export function ContactList({ contacts }: ContactListProps) {
       default:
         return 'bg-gray-100 text-gray-800';
     }
-  };
-
-  const handleDraftEmail = (contact: ContactWithAnalysis) => {
-    setSelectedContact(contact);
-    const template = getTemplateByCategory(contact.category === 'warm' || contact.category === 'hot' ? 'cold' : contact.category);
-    setSelectedTemplate(template || null);
-    setShowEditor(false);
-  };
-
-  const handleTemplateSelect = (template: EmailTemplate) => {
-    setSelectedTemplate(template);
-  };
-
-  const handleCreateDraft = () => {
-    if (selectedTemplate) {
-      setShowEditor(true);
-    }
-  };
-
-  const handleSaveDraft = (draft: { subject: string; body: string; htmlBody: string }) => {
-    console.log('Draft saved:', draft);
-    // TODO: Save to state/store
-    setShowEditor(false);
-    setSelectedContact(null);
-    setSelectedTemplate(null);
-  };
-
-  const handleSendEmail = (email: { subject: string; body: string; htmlBody: string; to: string }) => {
-    console.log('Email sent:', email);
-    // TODO: Integrate with email API (Outlook/Gmail)
-    alert(`Email sent to ${email.to}!\nSubject: ${email.subject}`);
-    setShowEditor(false);
-    setSelectedContact(null);
-    setSelectedTemplate(null);
-  };
-
-  const handleCancel = () => {
-    setShowEditor(false);
-    setSelectedContact(null);
-    setSelectedTemplate(null);
   };
 
   return (
@@ -101,7 +54,7 @@ export function ContactList({ contacts }: ContactListProps) {
                   </div>
                 </div>
                 <button 
-                  onClick={() => handleDraftEmail(contact)}
+                  onClick={() => onDraftEmail(contact)}
                   className="text-xs text-primary-600 hover:text-primary-700 font-medium px-2 py-1 hover:bg-primary-50 rounded transition-colors"
                 >
                   Draft
@@ -110,35 +63,6 @@ export function ContactList({ contacts }: ContactListProps) {
             </div>
           ))}
         </div>
-      )}
-
-      {/* Email Template Selection */}
-      {selectedContact && !showEditor && (
-        <EmailTemplateSelector
-          selectedCategory={selectedContact.category === 'warm' || selectedContact.category === 'hot' ? 'cold' : selectedContact.category}
-          onTemplateSelect={handleTemplateSelect}
-        />
-      )}
-
-      {/* Create Draft Button */}
-      {selectedTemplate && !showEditor && (
-        <div className="flex justify-center">
-          <button onClick={handleCreateDraft} className="text-xs bg-primary-600 hover:bg-primary-700 text-white px-3 py-1 rounded transition-colors">
-            Create Draft
-          </button>
-        </div>
-      )}
-
-      {/* Email Editor */}
-      {showEditor && selectedTemplate && selectedContact && (
-        <EmailEditor
-          template={selectedTemplate}
-          contactName={selectedContact.name}
-          contactEmail={selectedContact.email}
-          onSave={handleSaveDraft}
-          onSend={handleSendEmail}
-          onCancel={handleCancel}
-        />
       )}
     </div>
   );
