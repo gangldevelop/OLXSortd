@@ -198,7 +198,12 @@ export class MicrosoftGraphService {
   /**
    * Make authenticated API call to Microsoft Graph
    */
-  private async makeGraphApiCall<T>(endpoint: string, method: 'GET' | 'POST' = 'GET', body?: unknown): Promise<T> {
+  private async makeGraphApiCall<T>(
+    endpoint: string,
+    method: 'GET' | 'POST' = 'GET',
+    body?: unknown,
+    extraHeaders: Record<string, string> = {}
+  ): Promise<T> {
     const token = await this.getAccessToken();
     if (!token) {
       throw new Error('No access token available');
@@ -208,7 +213,8 @@ export class MicrosoftGraphService {
     const headers = {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
-    };
+      ...extraHeaders,
+    } as Record<string, string>;
 
     const options: RequestInit = {
       method,
@@ -266,9 +272,13 @@ export class MicrosoftGraphService {
    */
   async getLastEmailWithContact(contactEmail: string): Promise<{ subject: string; html: string; receivedDateTime: string } | null> {
     try {
-      const encoded = contactEmail.replace(/'/g, "''");
-      const response = await this.makeGraphApiCall<{ value: Array<{ subject: string; body: { contentType: string; content: string }; receivedDateTime: string }> }>(
-        `/me/messages?$filter=(from/emailAddress/address eq '${encoded}') or (toRecipients/any(r:r/emailAddress/address eq '${encoded}'))&$orderby=receivedDateTime desc&$top=1&$select=subject,body,receivedDateTime`
+      const encoded = encodeURIComponent(contactEmail);
+      const endpoint = `/me/messages?$search=%22${encoded}%22&$orderby=receivedDateTime desc&$top=1&$select=subject,body,receivedDateTime,from,toRecipients`;
+      const response = await this.makeGraphApiCall<{ value: Array<{ subject: string; body: { contentType: string; content: string }; receivedDateTime: string; from: any; toRecipients: any[] }> }>(
+        endpoint,
+        'GET',
+        undefined,
+        { 'ConsistencyLevel': 'eventual' }
       );
       const msg = response.value?.[0];
       if (!msg) return null;
