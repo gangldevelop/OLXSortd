@@ -262,6 +262,26 @@ export class MicrosoftGraphService {
   }
 
   /**
+   * Get the most recent email (subject + HTML body) exchanged with a contact
+   */
+  async getLastEmailWithContact(contactEmail: string): Promise<{ subject: string; html: string; receivedDateTime: string } | null> {
+    try {
+      const encoded = contactEmail.replace(/'/g, "''");
+      const response = await this.makeGraphApiCall<{ value: Array<{ subject: string; body: { contentType: string; content: string }; receivedDateTime: string }> }>(
+        `/me/messages?$filter=(from/emailAddress/address eq '${encoded}') or (toRecipients/any(r:r/emailAddress/address eq '${encoded}'))&$orderby=receivedDateTime desc&$top=1&$select=subject,body,receivedDateTime`
+      );
+      const msg = response.value?.[0];
+      if (!msg) return null;
+      const isHtml = (msg.body?.contentType || '').toLowerCase() === 'html';
+      const html = isHtml ? (msg.body?.content || '') : (msg.body?.content || '').replace(/\n/g, '<br/>');
+      return { subject: msg.subject || 'No Subject', html, receivedDateTime: msg.receivedDateTime };
+    } catch (error) {
+      console.error('Failed to get last email for contact:', error);
+      return null;
+    }
+  }
+
+  /**
    * Smart contact extraction - get unique contacts from email history efficiently
    * Optimized for large-scale processing with progress tracking
    */

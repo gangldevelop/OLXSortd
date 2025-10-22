@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
+import DOMPurify from 'dompurify';
 import { ContactList } from './components/ContactList';
 import { ContactSearch } from './components/ContactSearch';
 import { Authentication } from './components/Authentication';
@@ -211,6 +212,8 @@ function App() {
   const [progress, setProgress] = useState<ProgressUpdate | null>(null);
   const [filteredContacts, setFilteredContacts] = useState<ContactWithAnalysis[]>([]);
   const [selectedContactForDetails, setSelectedContactForDetails] = useState<ContactWithAnalysis | null>(null);
+  const [lastEmailHtml, setLastEmailHtml] = useState<string | null>(null);
+  const [isLoadingLastEmail, setIsLoadingLastEmail] = useState(false);
   
   const batchedAnalysis = new BatchedContactAnalysis();
   const emailTemplatesRef = useRef<HTMLDivElement>(null);
@@ -256,8 +259,16 @@ function App() {
     }, 100);
   };
 
-  const handleShowContactDetails = (contact: ContactWithAnalysis) => {
+  const handleShowContactDetails = async (contact: ContactWithAnalysis) => {
     setSelectedContactForDetails(contact);
+    setIsLoadingLastEmail(true);
+    setLastEmailHtml(null);
+    try {
+      const msg = await graphService.getLastEmailWithContact(contact.email);
+      setLastEmailHtml(msg?.html ?? null);
+    } finally {
+      setIsLoadingLastEmail(false);
+    }
   };
 
   const handleTemplateSelect = (template: EmailTemplate) => {
@@ -592,49 +603,25 @@ function App() {
             </div>
             
             <div className="p-4 overflow-y-auto max-h-[60vh]">
-              {selectedContactForDetails.lastEmailSubject ? (
-                <div className="space-y-3">
-                  <div className="bg-gray-50 p-3 rounded">
-                    <div className="text-sm font-medium text-gray-900 mb-2">Subject</div>
-                    <div className="text-sm text-gray-700">{selectedContactForDetails.lastEmailSubject}</div>
-                  </div>
-                  
-                  <div className="bg-gray-50 p-3 rounded">
-                    <div className="text-sm font-medium text-gray-900 mb-2">Contact Info</div>
-                    <div className="text-sm text-gray-700">
-                      <div>Email: {selectedContactForDetails.email}</div>
-                      <div>Category: {selectedContactForDetails.category}</div>
-                      <div>Total Emails: {selectedContactForDetails.emailCount}</div>
-                      <div>Response Rate: {Math.round(selectedContactForDetails.responseRate * 100)}%</div>
-                      {selectedContactForDetails.lastContactDate && (
-                        <div>Last Contact: {selectedContactForDetails.lastContactDate.toLocaleDateString()}</div>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div className="bg-blue-50 p-3 rounded">
-                    <div className="text-sm font-medium text-blue-900 mb-2">Analysis Insights</div>
-                    <div className="text-sm text-blue-700">
-                      {selectedContactForDetails.analysis.insights.length > 0 ? (
-                        <ul className="list-disc list-inside space-y-1">
-                          {selectedContactForDetails.analysis.insights.map((insight, index) => (
-                            <li key={index}>{insight}</li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <div>No specific insights available for this contact.</div>
-                      )}
-                    </div>
-                  </div>
-                </div>
+              {isLoadingLastEmail ? (
+                <div className="text-sm text-gray-500">Loading last email…</div>
+              ) : lastEmailHtml ? (
+                <div className="prose max-w-none text-sm" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(lastEmailHtml) }} />
               ) : (
-                <div className="text-center py-8">
-                  <div className="text-gray-500 mb-4">No email history available</div>
-                  <div className="text-sm text-gray-400">
-                    This contact hasn't been contacted yet or email data isn't available.
-                  </div>
-                </div>
+                <div className="text-sm text-gray-500">No email body available</div>
               )}
+              <div className="mt-4 bg-gray-50 p-3 rounded">
+                <div className="text-sm font-medium text-gray-900 mb-2">Contact Info</div>
+                <div className="text-sm text-gray-700">
+                  <div>Email: {selectedContactForDetails.email}</div>
+                  <div>Category: {selectedContactForDetails.category}</div>
+                  <div>Total Emails: {selectedContactForDetails.emailCount}</div>
+                  <div>Response Rate: {Math.round(selectedContactForDetails.responseRate * 100)}%</div>
+                  {selectedContactForDetails.lastContactDate && (
+                    <div>Last Contact: {selectedContactForDetails.lastContactDate.toLocaleDateString()}</div>
+                  )}
+                </div>
+              </div>
             </div>
             
             <div className="flex justify-end gap-2 p-4 border-t border-gray-200">
