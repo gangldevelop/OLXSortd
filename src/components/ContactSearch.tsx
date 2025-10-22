@@ -134,16 +134,8 @@ export function ContactSearch({
     setFilters(prev => ({ ...prev, searchTerm: value }));
   };
 
-  const handleResponseRateChange = (range: [number, number]) => {
-    setFilters(prev => ({ ...prev, responseRateRange: range }));
-  };
-
   const handleLastContactChange = (value: string) => {
     setFilters(prev => ({ ...prev, lastContactFilter: value }));
-  };
-
-  const handleEmailCountChange = (range: [number, number]) => {
-    setFilters(prev => ({ ...prev, emailCountRange: range }));
   };
 
   const handleResponseRateInput = (index: 0 | 1, value: string) => {

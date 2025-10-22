@@ -1,4 +1,3 @@
-import React from 'react';
 import type { ContactWithAnalysis } from '../types/contact';
 
 interface ContactAnalysisSummaryProps {

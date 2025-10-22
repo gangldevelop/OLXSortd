@@ -4,12 +4,28 @@ import App from './App'
 import './index.css'
 
 // Initialize Office.js
-Office.onReady((info) => {
-  if (info.host === Office.HostType.Outlook) {
-    ReactDOM.createRoot(document.getElementById('root')!).render(
-      <React.StrictMode>
-        <App platform="outlook" />
-      </React.StrictMode>,
-    )
+declare global {
+  interface Window {
+    Office: any;
   }
-});
+}
+
+// Initialize Office.js
+if (typeof window !== 'undefined' && window.Office) {
+  window.Office.onReady((info: any) => {
+    if (info.host === window.Office.HostType.Outlook) {
+      ReactDOM.createRoot(document.getElementById('root')!).render(
+        <React.StrictMode>
+          <App />
+        </React.StrictMode>,
+      )
+    }
+  });
+} else {
+  // Fallback for development
+  ReactDOM.createRoot(document.getElementById('root')!).render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>,
+  )
+}
