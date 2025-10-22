@@ -232,7 +232,22 @@ export class MicrosoftGraphService {
         throw new Error(`Graph API call failed: ${response.status} ${response.statusText}`);
       }
 
-      return await response.json();
+      // Some Graph endpoints (e.g., /me/sendMail) return 202/204 with no body
+      const status = response.status;
+      const contentLength = response.headers.get('content-length');
+      const contentType = response.headers.get('content-type') || '';
+      const hasBody = contentLength === null || contentLength === undefined || contentLength === '' || Number(contentLength) > 0;
+
+      if (status === 202 || status === 204 || !hasBody) {
+        return undefined as unknown as T;
+      }
+
+      if (contentType.includes('application/json')) {
+        return (await response.json()) as T;
+      }
+
+      // Fallback to text for non-JSON responses
+      return (await response.text()) as unknown as T;
     } catch (error) {
       console.error('Graph API call failed:', error);
       throw error;
@@ -272,13 +287,11 @@ export class MicrosoftGraphService {
    */
   async getLastEmailWithContact(contactEmail: string): Promise<{ subject: string; html: string; receivedDateTime: string } | null> {
     try {
-      const encoded = encodeURIComponent(contactEmail);
-      const endpoint = `/me/messages?$search=%22${encoded}%22&$orderby=receivedDateTime desc&$top=1&$select=subject,body,receivedDateTime,from,toRecipients`;
-      const response = await this.makeGraphApiCall<{ value: Array<{ subject: string; body: { contentType: string; content: string }; receivedDateTime: string; from: any; toRecipients: any[] }> }>(
-        endpoint,
-        'GET',
-        undefined,
-        { 'ConsistencyLevel': 'eventual' }
+      // Use $filter with exact address match and order by most recent
+      const safeEmail = contactEmail.replace(/'/g, "''");
+      const endpoint = `/me/messages?$filter=(from/emailAddress/address eq '${safeEmail}') or (toRecipients/any(r:r/emailAddress/address eq '${safeEmail}'))&$orderby=receivedDateTime desc&$top=1&$select=subject,body,receivedDateTime,from,toRecipients`;
+      const response = await this.makeGraphApiCall<{ value: Array<{ subject: string; body: { contentType: string; content: string }; receivedDateTime: string }> }>(
+        endpoint
       );
       const msg = response.value?.[0];
       if (!msg) return null;
