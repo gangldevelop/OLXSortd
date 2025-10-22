@@ -12,10 +12,11 @@ import type { EmailTemplate } from './types/email';
 import type { ProgressUpdate } from './services/progressTracker';
 
 // Compact Analysis Summary Component
-function AnalysisSummary({ contacts, onCategoryClick, onDraftEmail }: { 
+function AnalysisSummary({ contacts, onCategoryClick, onDraftEmail, onShowContactDetails }: { 
   contacts: ContactWithAnalysis[];
   onCategoryClick: (category: string | null) => void;
   onDraftEmail: (contact: ContactWithAnalysis) => void;
+  onShowContactDetails: (contact: ContactWithAnalysis) => void;
 }) {
   const [needsAttentionContacts, setNeedsAttentionContacts] = useState<ContactWithAnalysis[]>([]);
   const summary = {
@@ -157,7 +158,7 @@ function AnalysisSummary({ contacts, onCategoryClick, onDraftEmail }: {
                 : null;
 
               return (
-                <div key={contact.id} className="flex items-start justify-between p-2 bg-gray-50 rounded hover:bg-gray-100 transition-colors">
+                <div key={contact.id} className="flex items-start justify-between p-2 bg-gray-50 rounded hover:bg-gray-100 transition-colors cursor-pointer" onClick={() => onShowContactDetails(contact)}>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-sm">{getCategoryIcon(contact.category)}</span>
@@ -178,7 +179,10 @@ function AnalysisSummary({ contacts, onCategoryClick, onDraftEmail }: {
                     </div>
                   </div>
                   <button 
-                    onClick={() => onDraftEmail(contact)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDraftEmail(contact);
+                    }}
                     className="text-xs text-primary-600 hover:text-primary-700 font-medium px-2 py-1 hover:bg-primary-50 rounded transition-colors ml-2"
                     title="Draft email to this contact"
                   >
@@ -190,6 +194,7 @@ function AnalysisSummary({ contacts, onCategoryClick, onDraftEmail }: {
           </div>
         </div>
       )}
+
     </div>
   );
 }
@@ -205,6 +210,7 @@ function App() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [progress, setProgress] = useState<ProgressUpdate | null>(null);
   const [filteredContacts, setFilteredContacts] = useState<ContactWithAnalysis[]>([]);
+  const [selectedContactForDetails, setSelectedContactForDetails] = useState<ContactWithAnalysis | null>(null);
   
   const batchedAnalysis = new BatchedContactAnalysis();
   const emailTemplatesRef = useRef<HTMLDivElement>(null);
@@ -248,6 +254,10 @@ function App() {
         block: 'start' 
       });
     }, 100);
+  };
+
+  const handleShowContactDetails = (contact: ContactWithAnalysis) => {
+    setSelectedContactForDetails(contact);
   };
 
   const handleTemplateSelect = (template: EmailTemplate) => {
@@ -489,7 +499,7 @@ function App() {
 
           {/* Main Content - Single Column for Outlook Sidebar */}
           <div className="p-4 space-y-4 h-full flex flex-col">
-            <AnalysisSummary contacts={contacts} onCategoryClick={handleCategoryClick} onDraftEmail={handleDraftEmail} />
+            <AnalysisSummary contacts={contacts} onCategoryClick={handleCategoryClick} onDraftEmail={handleDraftEmail} onShowContactDetails={handleShowContactDetails} />
             
             {/* Category Filter Indicator */}
             {selectedCategory && (
@@ -565,6 +575,88 @@ function App() {
               )}
             </div>
           </div>
+      {/* Email Details Modal */}
+      {selectedContactForDetails && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Last Email with {selectedContactForDetails.name}
+              </h3>
+              <button
+                onClick={() => setSelectedContactForDetails(null)}
+                className="text-gray-400 hover:text-gray-600 text-xl"
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="p-4 overflow-y-auto max-h-[60vh]">
+              {selectedContactForDetails.lastEmailSubject ? (
+                <div className="space-y-3">
+                  <div className="bg-gray-50 p-3 rounded">
+                    <div className="text-sm font-medium text-gray-900 mb-2">Subject</div>
+                    <div className="text-sm text-gray-700">{selectedContactForDetails.lastEmailSubject}</div>
+                  </div>
+                  
+                  <div className="bg-gray-50 p-3 rounded">
+                    <div className="text-sm font-medium text-gray-900 mb-2">Contact Info</div>
+                    <div className="text-sm text-gray-700">
+                      <div>Email: {selectedContactForDetails.email}</div>
+                      <div>Category: {selectedContactForDetails.category}</div>
+                      <div>Total Emails: {selectedContactForDetails.emailCount}</div>
+                      <div>Response Rate: {Math.round(selectedContactForDetails.responseRate * 100)}%</div>
+                      {selectedContactForDetails.lastContactDate && (
+                        <div>Last Contact: {selectedContactForDetails.lastContactDate.toLocaleDateString()}</div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="bg-blue-50 p-3 rounded">
+                    <div className="text-sm font-medium text-blue-900 mb-2">Analysis Insights</div>
+                    <div className="text-sm text-blue-700">
+                      {selectedContactForDetails.analysis.insights.length > 0 ? (
+                        <ul className="list-disc list-inside space-y-1">
+                          {selectedContactForDetails.analysis.insights.map((insight, index) => (
+                            <li key={index}>{insight}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <div>No specific insights available for this contact.</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <div className="text-gray-500 mb-4">No email history available</div>
+                  <div className="text-sm text-gray-400">
+                    This contact hasn't been contacted yet or email data isn't available.
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <div className="flex justify-end gap-2 p-4 border-t border-gray-200">
+              <button
+                onClick={() => setSelectedContactForDetails(null)}
+                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  setSelectedContactForDetails(null);
+                  handleDraftEmail(selectedContactForDetails);
+                }}
+                className="px-4 py-2 text-sm bg-primary-600 text-white rounded hover:bg-primary-700 transition-colors"
+              >
+                Draft Email
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       </div>
   );
 }
