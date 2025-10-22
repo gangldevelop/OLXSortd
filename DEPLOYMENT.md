@@ -14,12 +14,12 @@ This guide will help you deploy OLXSortd to GitHub Pages for free hosting.
 
 ### Step 2: Push Your Code
 
-The deployment will happen automatically when you push to the `main` branch:
+The deployment will happen automatically when you push to the `master` branch:
 
 ```bash
 git add .
 git commit -m "Deploy to GitHub Pages"
-git push origin main
+git push origin master
 ```
 
 ### Step 3: Wait for Deployment
@@ -126,7 +126,7 @@ You can check deployment status by:
 
 ## 🔄 Automatic Updates
 
-Every time you push to the `main` branch:
+Every time you push to the `master` branch:
 1. GitHub Actions automatically builds the project
 2. Deploys the new version to GitHub Pages
 3. Your live site updates within minutes

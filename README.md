@@ -222,7 +222,7 @@ The project follows a clean architecture pattern:
 ### GitHub Pages (Recommended for Prototypes)
 ```bash
 # Automatic deployment via GitHub Actions
-git push origin main
+git push origin master
 
 # Manual deployment
 npm run build:github
