@@ -7,13 +7,15 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:github": "tsc -b && vite build --base=/OLXSortd/",
     "build:outlook": "npm run build && npm run build:outlook-manifest",
     "build:gmail": "npm run build && npm run build:gmail-manifest",
     "build:outlook-manifest": "node scripts/build-outlook-manifest.js",
     "build:gmail-manifest": "node scripts/build-gmail-manifest.js",
     "lint": "eslint .",
     "preview": "vite preview",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "deploy": "npm run build:github && gh-pages -d dist"
   },
   "dependencies": {
     "@azure/msal-browser": "^4.25.1",
@@ -32,6 +34,7 @@
     "eslint": "^9.36.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.22",
+    "gh-pages": "^6.1.1",
     "globals": "^16.4.0",
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.1",

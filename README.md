@@ -219,6 +219,20 @@ The project follows a clean architecture pattern:
 
 ## 🚀 Deployment
 
+### GitHub Pages (Recommended for Prototypes)
+```bash
+# Automatic deployment via GitHub Actions
+git push origin main
+
+# Manual deployment
+npm run build:github
+npm run deploy
+```
+
+Your app will be available at: `https://yourusername.github.io/OLXSortd/`
+
+For detailed deployment instructions, see [DEPLOYMENT.md](./DEPLOYMENT.md).
+
 ### Outlook Add-in
 ```bash
 npm run build:outlook
@@ -231,7 +245,7 @@ npm run build:gmail
 # Upload the dist/ folder to Chrome Web Store
 ```
 
-### Web Application
+### Other Web Hosting
 ```bash
 npm run build
 # Deploy the dist/ folder to your web hosting service
