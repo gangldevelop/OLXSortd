@@ -1,5 +1,7 @@
-import { ContactAnalysisService } from './contactAnalysisService';
 import { ProgressTracker, type ProgressUpdate } from './progressTracker';
+// Vite worker constructor import (bundles dependencies automatically)
+// @ts-ignore
+import AnalysisWorker from './workers/contactAnalysisWorker.ts?worker';
 import type { ContactWithAnalysis } from '../types/contact';
 import type { EmailInteraction } from '../types/contact';
 
@@ -12,11 +14,9 @@ export interface BatchedAnalysisOptions {
 }
 
 export class BatchedContactAnalysis {
-  private analysisService: ContactAnalysisService;
   private progressTracker: ProgressTracker;
 
   constructor() {
-    this.analysisService = new ContactAnalysisService();
     this.progressTracker = new ProgressTracker();
   }
 
@@ -82,7 +82,7 @@ export class BatchedContactAnalysis {
       this.progressTracker.completeStage('preparing_analysis', `Analysis preparation complete - ${interactionsByContact.size} contacts with interactions`);
 
       // Stage 2: Analyze contacts in batches
-      this.progressTracker.updateStageProgress('analyzing_contacts', 0, totalBatches, 'Analyzing contacts...');
+      this.progressTracker.updateStageProgress('analyzing_contacts', 0, totalContacts, 'Starting contact analysis...');
       
       const analyzedContacts: ContactWithAnalysis[] = [];
       const batches: Array<{ id: string; name: string; email: string }[]> = [];
@@ -92,21 +92,56 @@ export class BatchedContactAnalysis {
         batches.push(contacts.slice(i, i + batchSize));
       }
 
-      // Process batches with concurrency control
+      console.log(`Created ${batches.length} batches of size ${batchSize}`);
+
+      // Always show initial progress
+      this.progressTracker.updateStageProgress('analyzing_contacts', 0, totalContacts, `Starting analysis of ${totalContacts.toLocaleString()} contacts...`);
+
+      let processedContacts = 0;
+
+      // Process batches with concurrency control using a worker pool
       for (let i = 0; i < batches.length; i += maxConcurrentBatches) {
         const currentBatches = batches.slice(i, i + maxConcurrentBatches);
-        
-        // Process batches in parallel
+
         const batchPromises = currentBatches.map(async (batch) => {
-          const batchContacts: ContactWithAnalysis[] = [];
-          
+          // Build serializable interactions map for worker
+          const serializableMap: Record<string, Array<{ id: string; contactId: string; subject: string; date: string; direction: 'sent' | 'received'; isRead: boolean; isReplied: boolean; threadId?: string }>> = {};
           for (const contact of batch) {
             const contactInteractions = interactionsByContact.get(contact.id) || [];
-            const analysis = this.analysisService.analyzeContacts([contact], contactInteractions);
-            batchContacts.push(...analysis);
+            serializableMap[contact.id] = contactInteractions.map(ci => ({
+              ...ci,
+              date: ci.date.toISOString(),
+            }));
           }
-          
-          return batchContacts;
+
+          const worker: Worker = new (AnalysisWorker as unknown as { new(): Worker })();
+          const jobId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+          const analyzed = await new Promise<ContactWithAnalysis[]>((resolve, reject) => {
+            const onMessage = (ev: MessageEvent) => {
+              const data = ev.data as { jobId: string; type: 'progress' | 'result'; processed?: number; total?: number; analyzedContacts?: ContactWithAnalysis[] };
+              if (data.type === 'progress') {
+                // Aggregate progress across workers
+                const processed = Math.min(totalContacts, (processedContacts + (data.processed || 0)));
+                this.progressTracker.updateStageProgress(
+                  'analyzing_contacts',
+                  processed,
+                  totalContacts,
+                  `Analyzing ${processed.toLocaleString()} / ${totalContacts.toLocaleString()} contacts...`
+                );
+              } else if (data.type === 'result') {
+                worker.removeEventListener('message', onMessage);
+                worker.terminate();
+                resolve(data.analyzedContacts || []);
+              }
+            };
+            worker.addEventListener('message', onMessage);
+            worker.addEventListener('error', err => reject(err));
+            worker.postMessage({ jobId, contacts: batch, interactionsByContact: serializableMap, chunkSize: Math.min(200, Math.max(50, Math.floor(batch.length / 2))) });
+          });
+
+          processedContacts += analyzed.length;
+          return analyzed;
         });
 
         const batchResults = await Promise.all(batchPromises);
@@ -116,19 +151,21 @@ export class BatchedContactAnalysis {
           analyzedContacts.push(...result);
         });
 
-        // Update progress
+        processedContacts = analyzedContacts.length;
         const processedBatches = Math.min(i + maxConcurrentBatches, batches.length);
+        
+        console.log(`Processed ${processedContacts} contacts (batch ${processedBatches}/${batches.length})`);
+        
+        // Update progress after each batch group completes
         this.progressTracker.updateStageProgress(
           'analyzing_contacts',
-          processedBatches,
-          totalBatches,
-          `Analyzed ${analyzedContacts.length.toLocaleString()} / ${totalContacts.toLocaleString()} contacts (${processedBatches}/${totalBatches} batches)...`
+          processedContacts,
+          totalContacts,
+          `Analyzed ${processedContacts.toLocaleString()} / ${totalContacts.toLocaleString()} contacts (${processedBatches}/${batches.length} batches)...`
         );
 
-        // Small delay to prevent overwhelming the system
-        if (i + maxConcurrentBatches < batches.length) {
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
+        // Brief delay to ensure UI updates are visible (reduced for speed)
+        await new Promise(resolve => setTimeout(resolve, 20));
       }
 
       this.progressTracker.completeStage('analyzing_contacts', 'Contact analysis complete');
@@ -183,12 +220,15 @@ export class BatchedContactAnalysis {
   }
 
   /**
-   * Get recommended batch size based on contact count
+   * Get recommended batch size based on contact count - optimized for performance
    */
   getRecommendedBatchSize(contactCount: number): number {
-    if (contactCount < 500) return 50;
+    if (contactCount < 100) return 25;
+    if (contactCount < 200) return 50;
+    if (contactCount < 500) return 75;
     if (contactCount < 2000) return 100;
+    if (contactCount < 5000) return 150;
     if (contactCount < 10000) return 200;
-    return 500; // For very large datasets
+    return 300; // For very large datasets (10k+)
   }
 }

@@ -1,14 +1,19 @@
-import React, { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { EmailTemplate } from '../types/email';
 import { emailTemplates } from '../data/emailTemplates';
 
 interface EmailTemplateSelectorProps {
-  selectedCategory: 'frequent' | 'inactive' | 'cold';
+  selectedCategory: 'frequent' | 'inactive' | 'cold' | 'warm' | 'hot';
   onTemplateSelect: (template: EmailTemplate) => void;
 }
 
 export function EmailTemplateSelector({ selectedCategory, onTemplateSelect }: EmailTemplateSelectorProps) {
   const [selectedTemplate, setSelectedTemplate] = useState<string>('');
+
+  // Reset selection when category changes
+  useEffect(() => {
+    setSelectedTemplate('');
+  }, [selectedCategory]);
 
   const categoryTemplates = emailTemplates.filter(template => template.category === selectedCategory);
 

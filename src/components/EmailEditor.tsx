@@ -7,15 +7,16 @@ interface EmailEditorProps {
   template: EmailTemplate;
   contactName: string;
   contactEmail: string;
+  senderName: string;
   onSave: (draft: { subject: string; body: string; htmlBody: string }) => void;
   onSend: (email: { subject: string; body: string; htmlBody: string; to: string }) => void;
   onCancel: () => void;
 }
 
-export function EmailEditor({ template, contactName, contactEmail, onSave, onSend, onCancel }: EmailEditorProps) {
+export function EmailEditor({ template, contactName, contactEmail, senderName, onSave, onSend, onCancel }: EmailEditorProps) {
   const [variables, setVariables] = useState({
     name: contactName,
-    senderName: 'Your Name', // This would come from user settings
+    senderName: senderName,
     company: 'Your Company',
     industry: 'Your Industry'
   });
@@ -54,7 +55,7 @@ export function EmailEditor({ template, contactName, contactEmail, onSave, onSen
     setVariables(prev => ({ ...prev, [key]: value }));
   };
 
-  const handleBodyChange = (content: string, delta: unknown, source: string, editor: { getText: () => string }) => {
+  const handleBodyChange = (content: string, _delta: unknown, _source: string, editor: { getText: () => string }) => {
     setHtmlBody(content);
     setBody(editor.getText()); // Get plain text version
   };
@@ -139,7 +140,7 @@ export function EmailEditor({ template, contactName, contactEmail, onSave, onSen
         <label className="block text-xs font-medium text-gray-700 mb-1">
           Message
         </label>
-        <div className="border border-gray-300 rounded">
+        <div className="border border-gray-300 rounded overflow-hidden">
           <ReactQuill
             ref={quillRef}
             theme="snow"
@@ -147,7 +148,10 @@ export function EmailEditor({ template, contactName, contactEmail, onSave, onSen
             onChange={handleBodyChange}
             modules={quillModules}
             formats={quillFormats}
-            style={{ height: '120px' }}
+            style={{ 
+              height: '200px'
+            }}
+            className="quill-editor"
           />
         </div>
       </div>

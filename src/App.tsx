@@ -1,12 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { ContactList } from './components/ContactList';
+import { ContactSearch } from './components/ContactSearch';
 import { Authentication } from './components/Authentication';
 import { EmailTemplateSelector } from './components/EmailTemplateSelector';
 import { EmailEditor } from './components/EmailEditor';
 import { ProgressBar } from './components/ProgressBar';
 import { BatchedContactAnalysis } from './services/batchedContactAnalysis';
 import { graphService } from './services/microsoftGraphService';
-import { getTemplateByCategory } from './data/emailTemplates';
 import type { ContactWithAnalysis } from './types/contact';
 import type { EmailTemplate } from './types/email';
 import type { ProgressUpdate } from './services/progressTracker';
@@ -17,6 +17,7 @@ function AnalysisSummary({ contacts, onCategoryClick, onDraftEmail }: {
   onCategoryClick: (category: string | null) => void;
   onDraftEmail: (contact: ContactWithAnalysis) => void;
 }) {
+  const [needsAttentionContacts, setNeedsAttentionContacts] = useState<ContactWithAnalysis[]>([]);
   const summary = {
     total: contacts.length,
     frequent: contacts.filter(c => c.category === 'frequent').length,
@@ -26,75 +27,74 @@ function AnalysisSummary({ contacts, onCategoryClick, onDraftEmail }: {
     cold: contacts.filter(c => c.category === 'cold').length,
   };
 
-  const contactsNeedingAttention = contacts.filter(contact => 
-    contact.category === 'inactive' || 
-    (contact.category === 'cold' && contact.emailCount > 0)
-  ).sort((a, b) => {
-    // Sort by response rate first, then by days since last contact
-    if (a.responseRate !== b.responseRate) {
-      return b.responseRate - a.responseRate;
-    }
-    if (a.lastContactDate && b.lastContactDate) {
-      return b.lastContactDate.getTime() - a.lastContactDate.getTime();
-    }
-    return 0;
-  });
+  const contactsNeedingAttention = useMemo(() => {
+    return contacts.filter(contact => 
+      contact.category === 'inactive' || 
+      (contact.category === 'cold' && contact.emailCount > 0)
+    ).sort((a, b) => {
+      // Sort by response rate first, then by days since last contact
+      if (a.responseRate !== b.responseRate) {
+        return b.responseRate - a.responseRate;
+      }
+      if (a.lastContactDate && b.lastContactDate) {
+        return b.lastContactDate.getTime() - a.lastContactDate.getTime();
+      }
+      return 0;
+    });
+  }, [contacts]);
+
+  // Update needs attention contacts when contacts change
+  useEffect(() => {
+    setNeedsAttentionContacts(contactsNeedingAttention);
+  }, [contactsNeedingAttention]);
 
   return (
     <div className="space-y-3">
-          {/* Quick Stats */}
-          <div className="bg-white rounded border p-3">
-            <h3 className="text-sm font-semibold text-gray-900 mb-2">Analysis Summary</h3>
-            <div className="grid grid-cols-3 gap-2 text-center">
+          {/* Compact Analysis Summary */}
+          <div className="bg-white rounded border p-2">
+            <h3 className="text-xs font-semibold text-gray-700 mb-2">Contact Categories</h3>
+            <div className="flex flex-wrap gap-1">
               <button 
                 onClick={() => onCategoryClick(null)}
-                className="p-2 rounded hover:bg-gray-50 transition-colors cursor-pointer"
+                className="px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
                 title="Show all contacts"
               >
-                <div className="text-lg font-bold text-gray-900">{summary.total}</div>
-                <div className="text-xs text-gray-500">Total</div>
+                All ({summary.total})
               </button>
               <button 
                 onClick={() => onCategoryClick('frequent')}
-                className="p-2 rounded hover:bg-green-50 transition-colors cursor-pointer"
+                className="px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-700 hover:bg-green-200 transition-colors"
                 title="Show frequent contacts"
               >
-                <div className="text-lg font-bold text-green-600">{summary.frequent}</div>
-                <div className="text-xs text-gray-500">Frequent</div>
+                Frequent ({summary.frequent})
               </button>
               <button 
                 onClick={() => onCategoryClick('inactive')}
-                className="p-2 rounded hover:bg-orange-50 transition-colors cursor-pointer"
+                className="px-2 py-1 rounded text-xs font-medium bg-orange-100 text-orange-700 hover:bg-orange-200 transition-colors"
                 title="Show inactive contacts"
               >
-                <div className="text-lg font-bold text-orange-600">{summary.inactive}</div>
-                <div className="text-xs text-gray-500">Inactive</div>
+                Inactive ({summary.inactive})
               </button>
-            </div>
-            <div className="grid grid-cols-3 gap-2 text-center mt-2">
               <button 
                 onClick={() => onCategoryClick('warm')}
-                className="p-2 rounded hover:bg-yellow-50 transition-colors cursor-pointer"
+                className="px-2 py-1 rounded text-xs font-medium bg-yellow-100 text-yellow-700 hover:bg-yellow-200 transition-colors"
                 title="Show warm contacts"
               >
-                <div className="text-lg font-bold text-yellow-600">{summary.warm}</div>
-                <div className="text-xs text-gray-500">Warm</div>
+                Warm ({summary.warm})
               </button>
               <button 
                 onClick={() => onCategoryClick('hot')}
-                className="p-2 rounded hover:bg-red-50 transition-colors cursor-pointer"
+                className="px-2 py-1 rounded text-xs font-medium bg-red-100 text-red-700 hover:bg-red-200 transition-colors"
                 title="Show hot contacts"
               >
-                <div className="text-lg font-bold text-red-600">{summary.hot}</div>
-                <div className="text-xs text-gray-500">Hot</div>
+                Hot ({summary.hot})
               </button>
               <button 
                 onClick={() => onCategoryClick('cold')}
-                className="p-2 rounded hover:bg-gray-100 transition-colors cursor-pointer"
+                className="px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
                 title="Show cold contacts"
               >
-                <div className="text-lg font-bold text-gray-600">{summary.cold}</div>
-                <div className="text-xs text-gray-500">Cold</div>
+                Cold ({summary.cold})
               </button>
             </div>
           </div>
@@ -102,11 +102,22 @@ function AnalysisSummary({ contacts, onCategoryClick, onDraftEmail }: {
       {/* Contacts Needing Attention */}
       {contactsNeedingAttention.length > 0 && (
         <div className="bg-white rounded border p-3">
-          <h3 className="text-sm font-semibold text-gray-900 mb-2">
-            Needs Attention ({contactsNeedingAttention.length})
+          <h3 className="text-sm font-semibold text-gray-900 mb-3">
+            Needs Attention ({needsAttentionContacts.length})
           </h3>
+          
+          {/* Search for Needs Attention */}
+          <div className="mb-3">
+            <ContactSearch 
+              contacts={contactsNeedingAttention}
+              onFilteredContacts={setNeedsAttentionContacts}
+              placeholder="Search contacts needing attention..."
+              showAdvancedFilters={false}
+            />
+          </div>
+          
           <div className="max-h-48 overflow-y-auto space-y-2">
-            {contactsNeedingAttention.map((contact) => {
+            {needsAttentionContacts.map((contact) => {
               const getCategoryColor = (category: string) => {
                 switch (category) {
                   case 'frequent':
@@ -193,14 +204,30 @@ function App() {
   const [showEditor, setShowEditor] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [progress, setProgress] = useState<ProgressUpdate | null>(null);
+  const [filteredContacts, setFilteredContacts] = useState<ContactWithAnalysis[]>([]);
   
   const batchedAnalysis = new BatchedContactAnalysis();
+  const emailTemplatesRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isAuthenticated) {
       analyzeContacts();
     }
   }, [isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (progress) {
+      console.log('📊 Progress state updated:', progress);
+    }
+  }, [progress]);
+
+  useEffect(() => {
+    if (isAnalyzing) {
+      console.log('🔄 Analysis started, isAnalyzing:', isAnalyzing);
+    } else {
+      console.log('✅ Analysis completed, isAnalyzing:', isAnalyzing);
+    }
+  }, [isAnalyzing]);
 
   const handleAuthenticated = (userInfo: { displayName: string; mail: string; id: string }) => {
     setUser(userInfo);
@@ -209,16 +236,18 @@ function App() {
 
   const handleDraftEmail = (contact: ContactWithAnalysis) => {
     setSelectedContact(contact);
-    // Map warm/hot categories to appropriate templates
-    let templateCategory: 'frequent' | 'inactive' | 'cold';
-    if (contact.category === 'warm' || contact.category === 'hot') {
-      templateCategory = 'cold'; // Use warm/hot templates
-    } else {
-      templateCategory = contact.category as 'frequent' | 'inactive' | 'cold';
-    }
-    const template = getTemplateByCategory(templateCategory);
-    setSelectedTemplate(template || null);
+    
+    // Clear previously selected template so templates can be re-selected
+    setSelectedTemplate(null);
     setShowEditor(false);
+    
+    // Auto-scroll to email templates section
+    setTimeout(() => {
+      emailTemplatesRef.current?.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'start' 
+      });
+    }, 100);
   };
 
   const handleTemplateSelect = (template: EmailTemplate) => {
@@ -270,22 +299,33 @@ function App() {
   };
 
   // Filter contacts based on selected category
-  const filteredContacts = selectedCategory 
+  const categoryFilteredContacts = selectedCategory 
     ? contacts.filter(contact => contact.category === selectedCategory)
     : contacts;
 
-  const analyzeContacts = async (mode: 'quick' | 'balanced' | 'comprehensive' = 'balanced') => {
+  // Update filtered contacts when category changes
+  useEffect(() => {
+    setFilteredContacts(categoryFilteredContacts);
+  }, [categoryFilteredContacts]);
+
+  const analyzeContacts = async (mode: 'quick' | 'balanced' | 'comprehensive' = 'quick') => {
     setIsAnalyzing(true);
-    setSelectedCategory(null); // Reset category filter when analyzing
-    setProgress(null);
+    setSelectedCategory(null);
+    
+    // Set initial progress immediately
+    setProgress({
+      stage: 'preparing_analysis',
+      progress: 0,
+      message: 'Initializing analysis...',
+      itemsProcessed: 0,
+      totalItems: 0
+    });
     
     try {
       console.log(`Fetching real data from Microsoft Graph (${mode} mode)...`);
       
-      // Debug authentication status
       await graphService.debugAuthStatus();
       
-      // Ensure we have a valid access token before making API calls
       const token = await graphService.getAccessToken();
       if (!token) {
         throw new Error('No access token available. Please sign in again.');
@@ -293,26 +333,29 @@ function App() {
       
       console.log('Access token confirmed, fetching data...');
       
-      // Configure analysis options based on mode
       let analysisOptions;
       let emailInteractionLimit;
       
       switch (mode) {
         case 'quick':
           analysisOptions = { quickMode: true };
-          emailInteractionLimit = 1000;
+          emailInteractionLimit = 200; // last ~200 emails
           break;
         case 'comprehensive':
+        default:
           analysisOptions = { useAllEmails: true, maxEmails: 50000 };
-          emailInteractionLimit = 50000; // Much larger limit for comprehensive mode
-          break;
-        default: // balanced
-          analysisOptions = {};
-          emailInteractionLimit = 2000; // Increased from 200
+          emailInteractionLimit = 50000; // All within bounds
       }
       
-      // Get real contacts and email interactions from Graph API
       console.log('Fetching contacts and email interactions...');
+      
+      setProgress({
+        stage: 'preparing_analysis',
+        progress: 5,
+        message: 'Fetching contacts and emails from Microsoft Graph...',
+        itemsProcessed: 0,
+        totalItems: 0
+      });
       
       const [realContacts, realEmailInteractions] = await Promise.all([
         graphService.getContactsForAnalysis(analysisOptions),
@@ -320,25 +363,39 @@ function App() {
       ]);
 
       console.log('Data fetch complete, starting analysis...');
-      
       console.log(`Analyzing ${realContacts.length} contacts with ${realEmailInteractions.length} email interactions`);
       
-      // Use batched analysis for better performance with large datasets
+      setProgress({
+        stage: 'preparing_analysis',
+        progress: 10,
+        message: `Found ${realContacts.length} contacts and ${realEmailInteractions.length} email interactions. Starting analysis...`,
+        itemsProcessed: 0,
+        totalItems: realContacts.length
+      });
+      
+      console.log('Starting batched analysis with callbacks...');
+      
+      const batchSize = batchedAnalysis.getRecommendedBatchSize(realContacts.length);
+      // Increase concurrency for better performance
+      const maxConcurrent = realContacts.length > 5000 ? 4 : realContacts.length > 1000 ? 3 : 2;
+      
+      console.log(`Using batch size: ${batchSize}, max concurrent: ${maxConcurrent} for ${realContacts.length} contacts`);
+      
       const analyzedContacts = await batchedAnalysis.analyzeContactsInBatches(
         realContacts,
         realEmailInteractions,
         {
-          batchSize: batchedAnalysis.getRecommendedBatchSize(realContacts.length),
-          maxConcurrentBatches: 3,
+          batchSize,
+          maxConcurrentBatches: maxConcurrent,
           onProgress: (update) => {
-            console.log('App: Received progress update:', update);
+            console.log('✅ App: Received progress update:', JSON.stringify(update, null, 2));
             setProgress(update);
           },
           onComplete: () => {
-            console.log('Batched analysis completed successfully');
+            console.log('✅ Batched analysis completed successfully');
           },
           onError: (error) => {
-            console.error('Batched analysis failed:', error);
+            console.error('❌ Batched analysis failed:', error);
             throw error;
           }
         }
@@ -346,9 +403,20 @@ function App() {
       
       setContacts(analyzedContacts);
       console.log('Contact analysis completed successfully');
+      
+      // Ensure progress shows as complete before finishing
+      setProgress({
+        stage: 'finalizing_results',
+        progress: 100,
+        message: `Analysis complete! Processed ${analyzedContacts.length} contacts.`,
+        itemsProcessed: analyzedContacts.length,
+        totalItems: analyzedContacts.length
+      });
+      
+      // Keep analyzing state for a moment to show completion
+      await new Promise(resolve => setTimeout(resolve, 500));
     } catch (error) {
       console.error('Failed to analyze contacts:', error);
-      // Show user-friendly error message
       alert(`Failed to load your contacts and emails: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsAnalyzing(false);
@@ -395,14 +463,7 @@ function App() {
                 >
                   {isAnalyzing ? 'Analyzing...' : 'Quick'}
                 </button>
-                <button 
-                  onClick={() => analyzeContacts('balanced')}
-                  className="text-xs bg-primary-600 hover:bg-primary-700 text-white px-3 py-1 rounded transition-colors"
-                  disabled={isAnalyzing}
-                  title="Balanced analysis (~2-5min) - Good coverage"
-                >
-                  {isAnalyzing ? 'Analyzing...' : 'Analyze'}
-                </button>
+                {/* Removed Analyze to simplify modes */}
                 <button 
                   onClick={() => analyzeContacts('comprehensive')}
                   className="text-xs bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded transition-colors"
@@ -435,7 +496,7 @@ function App() {
               <div className="bg-blue-50 border border-blue-200 rounded p-2">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-blue-800">
-                    Showing {selectedCategory} contacts ({filteredContacts.length} of {contacts.length})
+                    Showing {selectedCategory} contacts ({filteredContacts.length} of {categoryFilteredContacts.length})
                   </span>
                   <button 
                     onClick={() => handleCategoryClick(null)}
@@ -449,17 +510,34 @@ function App() {
             
             {/* Contacts Section - Fixed height with scrolling */}
             <div className="flex-1 min-h-0">
-              <div className="h-full max-h-80 overflow-y-auto">
-                <ContactList contacts={filteredContacts} onDraftEmail={handleDraftEmail} />
+              <div className="bg-white rounded border p-3">
+                <h3 className="text-sm font-semibold text-gray-900 mb-3">
+                  {selectedCategory ? `${selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)} Contacts` : 'All Contacts'} ({filteredContacts.length})
+                </h3>
+                
+                {/* Search and Filter Controls */}
+                <div className="mb-3">
+                  <ContactSearch 
+                    contacts={categoryFilteredContacts}
+                    onFilteredContacts={setFilteredContacts}
+                    placeholder={`Search ${selectedCategory || 'all'} contacts...`}
+                    showAdvancedFilters={true}
+                  />
+                </div>
+                
+                <div className="h-full max-h-80 overflow-y-auto">
+                  <ContactList contacts={filteredContacts} onDraftEmail={handleDraftEmail} />
+                </div>
               </div>
             </div>
 
             {/* Email Templates Section - Always visible below contacts */}
-            <div className="space-y-3">
+            <div ref={emailTemplatesRef} className="space-y-3">
               {/* Email Template Selection */}
               {selectedContact && !showEditor && (
                 <EmailTemplateSelector
-                  selectedCategory={selectedContact.category === 'warm' || selectedContact.category === 'hot' ? 'cold' : selectedContact.category as 'frequent' | 'inactive' | 'cold'}
+                  key={selectedContact.id}
+                  selectedCategory={selectedContact.category}
                   onTemplateSelect={handleTemplateSelect}
                 />
               )}
@@ -479,6 +557,7 @@ function App() {
                   template={selectedTemplate}
                   contactName={selectedContact.name}
                   contactEmail={selectedContact.email}
+                  senderName={user?.displayName || 'Your Name'}
                   onSave={handleSaveDraft}
                   onSend={handleSendEmail}
                   onCancel={handleCancel}

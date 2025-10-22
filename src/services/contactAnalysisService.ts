@@ -17,18 +17,46 @@ export class ContactAnalysisService {
   }
 
   /**
-   * Analyzes all contacts and returns updated contact list with analysis
+   * Analyzes all contacts and returns updated contact list with analysis - OPTIMIZED
    */
   public analyzeContacts(
     contacts: Array<{ id: string; name: string; email: string }>,
     emailInteractions: EmailInteraction[]
   ): ContactWithAnalysis[] {
+    // Pre-group interactions by contact for O(1) lookup instead of O(n) filtering
+    const interactionsByContact = new Map<string, EmailInteraction[]>();
+    for (const interaction of emailInteractions) {
+      if (!interactionsByContact.has(interaction.contactId)) {
+        interactionsByContact.set(interaction.contactId, []);
+      }
+      interactionsByContact.get(interaction.contactId)!.push(interaction);
+    }
+
     return contacts.map(contact => {
-      const contactInteractions = emailInteractions.filter(
-        interaction => interaction.contactId === contact.id
-      );
+      const contactInteractions = interactionsByContact.get(contact.id) || [];
+      // Ensure interactions are sorted by date ascending once per contact
+      if (contactInteractions.length > 1) {
+        contactInteractions.sort((a, b) => a.date.getTime() - b.date.getTime());
+      }
 
       const analysis = this.analyzer.analyzeContact(contact.id, contactInteractions);
+      
+      // Extract last contact date more efficiently
+      let lastContactDate: Date | null = null;
+      let lastEmailSubject: string | undefined = undefined;
+      
+      if (contactInteractions.length > 0) {
+        // Single pass to find both max date and last subject
+        let maxTime = 0;
+        for (const interaction of contactInteractions) {
+          const time = interaction.date.getTime();
+          if (time > maxTime) {
+            maxTime = time;
+            lastContactDate = interaction.date;
+            lastEmailSubject = interaction.subject;
+          }
+        }
+      }
       
       const contactWithAnalysis: ContactWithAnalysis = {
         id: contact.id,
@@ -36,19 +64,65 @@ export class ContactAnalysisService {
         email: contact.email,
         category: analysis.category,
         analysis,
-        lastContactDate: contactInteractions.length > 0 
-          ? new Date(Math.max(...contactInteractions.map(i => i.date.getTime())))
-          : null,
+        lastContactDate,
         emailCount: contactInteractions.length,
         responseRate: analysis.metrics.responseRate,
         isActive: analysis.category === 'frequent',
-        lastEmailSubject: contactInteractions.length > 0 
-          ? contactInteractions[contactInteractions.length - 1].subject 
-          : undefined,
+        lastEmailSubject,
         tags: this.generateTags(analysis)
       };
 
-      // Cache the analysis
+      this.analysisCache.set(contact.id, contactWithAnalysis);
+
+      return contactWithAnalysis;
+    });
+  }
+
+  /**
+   * Analyze contacts with pre-grouped interactions - ULTRA FAST for batch processing
+   */
+  public analyzeContactsWithGroupedInteractions(
+    contacts: Array<{ id: string; name: string; email: string }>,
+    interactionsByContact: Map<string, EmailInteraction[]>
+  ): ContactWithAnalysis[] {
+    return contacts.map(contact => {
+      const contactInteractions = interactionsByContact.get(contact.id) || [];
+      // Ensure interactions are sorted by date ascending once per contact
+      if (contactInteractions.length > 1) {
+        contactInteractions.sort((a, b) => a.date.getTime() - b.date.getTime());
+      }
+
+      const analysis = this.analyzer.analyzeContact(contact.id, contactInteractions);
+      
+      let lastContactDate: Date | null = null;
+      let lastEmailSubject: string | undefined = undefined;
+      
+      if (contactInteractions.length > 0) {
+        let maxTime = 0;
+        for (const interaction of contactInteractions) {
+          const time = interaction.date.getTime();
+          if (time > maxTime) {
+            maxTime = time;
+            lastContactDate = interaction.date;
+            lastEmailSubject = interaction.subject;
+          }
+        }
+      }
+      
+      const contactWithAnalysis: ContactWithAnalysis = {
+        id: contact.id,
+        name: contact.name,
+        email: contact.email,
+        category: analysis.category,
+        analysis,
+        lastContactDate,
+        emailCount: contactInteractions.length,
+        responseRate: analysis.metrics.responseRate,
+        isActive: analysis.category === 'frequent',
+        lastEmailSubject,
+        tags: this.generateTags(analysis)
+      };
+
       this.analysisCache.set(contact.id, contactWithAnalysis);
 
       return contactWithAnalysis;

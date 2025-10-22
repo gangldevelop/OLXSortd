@@ -49,7 +49,7 @@ Would you be available for a quick call this week to discuss next steps?
 
 Best regards,
 {{senderName}}`,
-    category: 'cold', // Maps to cold since warm/hot use cold templates
+    category: 'warm',
     variables: ['name', 'topic', 'senderName']
   },
   {
@@ -66,7 +66,7 @@ Would you be interested in a brief call to discuss this opportunity?
 
 Best regards,
 {{senderName}}`,
-    category: 'cold', // Maps to cold since warm/hot use cold templates
+    category: 'hot',
     variables: ['name', 'company', 'industry', 'senderName']
   },
   {

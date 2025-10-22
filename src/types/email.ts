@@ -3,7 +3,7 @@ export interface EmailTemplate {
   name: string;
   subject: string;
   body: string;
-  category: 'frequent' | 'inactive' | 'cold';
+  category: 'frequent' | 'inactive' | 'cold' | 'warm' | 'hot';
   variables: string[];
 }
 

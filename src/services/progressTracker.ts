@@ -16,10 +16,11 @@ export interface ProgressTrackerOptions {
 export class ProgressTracker {
   private options: ProgressTrackerOptions;
   private startTime: number = 0;
-  private stageStartTime: number = 0;
   private currentStage: string = '';
   private totalStages: number = 0;
   private completedStages: number = 0;
+  private stageWeights: Map<string, number> = new Map();
+  private currentStageTotalItems: number = 0;
 
   constructor(options: ProgressTrackerOptions = {}) {
     this.options = options;
@@ -30,10 +31,14 @@ export class ProgressTracker {
    */
   start(totalStages: number, initialStage: string) {
     this.startTime = Date.now();
-    this.stageStartTime = Date.now();
     this.totalStages = totalStages;
     this.completedStages = 0;
     this.currentStage = initialStage;
+    
+    // Set default stage weights (preparing is quick, analyzing is the longest)
+    this.stageWeights.set('preparing_analysis', 0.1);
+    this.stageWeights.set('analyzing_contacts', 0.8);
+    this.stageWeights.set('finalizing_results', 0.1);
     
     this.updateProgress(0, `Starting ${initialStage}...`, 0, 0, 0);
   }
@@ -48,25 +53,40 @@ export class ProgressTracker {
     message?: string
   ) {
     if (stage !== this.currentStage) {
-      this.completedStages++;
-      this.stageStartTime = Date.now();
+      // Switch stage without advancing completed count; completion is tracked explicitly in completeStage
       this.currentStage = stage;
+      this.currentStageTotalItems = totalItems;
       console.log(`ProgressTracker: Starting new stage "${stage}" (completed stages: ${this.completedStages}/${this.totalStages})`);
     }
 
-    const stageProgress = totalItems > 0 ? (itemsProcessed / totalItems) * 100 : 0;
-    const overallProgress = ((this.completedStages + (stageProgress / 100)) / this.totalStages) * 100;
+    this.currentStageTotalItems = Math.max(this.currentStageTotalItems, totalItems);
+    
+    const stageProgress = this.currentStageTotalItems > 0 ? (itemsProcessed / this.currentStageTotalItems) * 100 : 0;
+    
+    // Calculate overall progress using stage weights
+    const stageWeight = this.stageWeights.get(stage) || (1 / this.totalStages);
+    
+    // Sum up weights of completed stages (explicitly controlled via completeStage)
+    // completedStages counts only fully completed stages
+    let completedWeights = 0;
+    const orderedStages = ['preparing_analysis', 'analyzing_contacts', 'finalizing_results'];
+    for (let i = 0; i < this.completedStages && i < orderedStages.length; i++) {
+      completedWeights += this.stageWeights.get(orderedStages[i]) || (1 / this.totalStages);
+    }
+    
+    const currentStageProgress = (stageProgress / 100) * stageWeight;
+    const overallProgress = (completedWeights + currentStageProgress) * 100;
     
     const estimatedTimeRemaining = this.calculateEstimatedTime(overallProgress);
     
-    console.log(`ProgressTracker: Stage "${stage}" - ${itemsProcessed}/${totalItems} (${Math.round(stageProgress)}%) - Overall: ${Math.round(overallProgress)}%`);
+    console.log(`ProgressTracker: Stage "${stage}" - ${itemsProcessed}/${this.currentStageTotalItems} (${Math.round(stageProgress)}%) - Overall: ${Math.round(overallProgress)}%`);
     
     this.updateProgress(
       Math.round(overallProgress),
-      message || `${stage}: ${itemsProcessed}/${totalItems}`,
+      message || `${stage}: ${itemsProcessed}/${this.currentStageTotalItems}`,
       estimatedTimeRemaining,
       itemsProcessed,
-      totalItems
+      this.currentStageTotalItems
     );
   }
 
