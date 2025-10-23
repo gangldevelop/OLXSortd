@@ -13,11 +13,12 @@ import type { EmailTemplate } from './types/email';
 import type { ProgressUpdate } from './services/progressTracker';
 
 // Compact Analysis Summary Component
-function AnalysisSummary({ contacts, onCategoryClick, onDraftEmail, onShowContactDetails }: { 
+function AnalysisSummary({ contacts, onCategoryClick, onDraftEmail, onShowContactDetails, onSnooze }: { 
   contacts: ContactWithAnalysis[];
   onCategoryClick: (category: string | null) => void;
   onDraftEmail: (contact: ContactWithAnalysis) => void;
   onShowContactDetails: (contact: ContactWithAnalysis) => void;
+  onSnooze: (contact: ContactWithAnalysis, days: number) => void;
 }) {
   const [needsAttentionContacts, setNeedsAttentionContacts] = useState<ContactWithAnalysis[]>([]);
   const summary = {
@@ -49,10 +50,6 @@ function AnalysisSummary({ contacts, onCategoryClick, onDraftEmail, onShowContac
   useEffect(() => {
     setNeedsAttentionContacts(contactsNeedingAttention);
   }, [contactsNeedingAttention]);
-
-  // Snooze handler will be injected from parent via a global function reference
-  // We keep a no-op fallback to satisfy types when not set yet
-  const snoozeFromSummary = (window as any).__olxSnoozeContact__ as undefined | ((c: ContactWithAnalysis, days: number) => void);
 
   return (
     <div className="space-y-3">
@@ -106,7 +103,7 @@ function AnalysisSummary({ contacts, onCategoryClick, onDraftEmail, onShowContac
           </div>
 
       {/* Contacts Needing Attention */}
-      {contactsNeedingAttention.length > 0 && (
+      {needsAttentionContacts.length > 0 && (
         <div className="bg-white rounded border p-3">
           <h3 className="text-sm font-semibold text-gray-900 mb-3">
             Needs Attention ({needsAttentionContacts.length})
@@ -115,7 +112,7 @@ function AnalysisSummary({ contacts, onCategoryClick, onDraftEmail, onShowContac
           {/* Search for Needs Attention */}
           <div className="mb-3">
             <ContactSearch 
-              contacts={contactsNeedingAttention}
+              contacts={needsAttentionContacts}
               onFilteredContacts={setNeedsAttentionContacts}
               placeholder="Search contacts needing attention..."
               showAdvancedFilters={false}
@@ -188,9 +185,9 @@ function AnalysisSummary({ contacts, onCategoryClick, onDraftEmail, onShowContac
                       <details>
                         <summary className="list-none cursor-pointer text-xs text-gray-600 hover:text-gray-800 px-2 py-1 rounded hover:bg-gray-100">Snooze ▾</summary>
                         <div className="absolute right-0 mt-1 bg-white border rounded shadow-sm z-10 text-xs">
-                          <button className="block px-3 py-1 hover:bg-gray-50 w-full text-left" onClick={(e) => { e.preventDefault(); snoozeFromSummary?.(contact, 7); }}>7 days</button>
-                          <button className="block px-3 py-1 hover:bg-gray-50 w-full text-left" onClick={(e) => { e.preventDefault(); snoozeFromSummary?.(contact, 14); }}>14 days</button>
-                          <button className="block px-3 py-1 hover:bg-gray-50 w-full text-left" onClick={(e) => { e.preventDefault(); snoozeFromSummary?.(contact, 30); }}>30 days</button>
+                          <button className="block px-3 py-1 hover:bg-gray-50 w-full text-left" onClick={(e) => { e.preventDefault(); onSnooze(contact, 7); }}>7 days</button>
+                          <button className="block px-3 py-1 hover:bg-gray-50 w-full text-left" onClick={(e) => { e.preventDefault(); onSnooze(contact, 14); }}>14 days</button>
+                          <button className="block px-3 py-1 hover:bg-gray-50 w-full text-left" onClick={(e) => { e.preventDefault(); onSnooze(contact, 30); }}>30 days</button>
                         </div>
                       </details>
                     </div>
@@ -266,8 +263,6 @@ function App() {
     saveSnoozes(updated);
     setFilteredContacts((prev) => prev.filter(c => c.email !== contact.email));
   };
-  // Expose snooze handler for AnalysisSummary rendering scope
-  (window as any).__olxSnoozeContact__ = handleSnoozeContact;
   
   const batchedAnalysis = new BatchedContactAnalysis();
   const emailTemplatesRef = useRef<HTMLDivElement>(null);
@@ -575,7 +570,7 @@ function App() {
 
           {/* Main Content - Single Column for Outlook Sidebar */}
           <div className="p-4 space-y-4 h-full flex flex-col">
-            <AnalysisSummary contacts={contacts} onCategoryClick={handleCategoryClick} onDraftEmail={handleDraftEmail} onShowContactDetails={handleShowContactDetails} />
+            <AnalysisSummary contacts={contacts} onCategoryClick={handleCategoryClick} onDraftEmail={handleDraftEmail} onShowContactDetails={handleShowContactDetails} onSnooze={handleSnoozeContact} />
             
             {/* Category Filter Indicator */}
             {selectedCategory && (
