@@ -214,6 +214,7 @@ function App() {
   const [selectedContactForDetails, setSelectedContactForDetails] = useState<ContactWithAnalysis | null>(null);
   const [lastEmailHtml, setLastEmailHtml] = useState<string | null>(null);
   const [isLoadingLastEmail, setIsLoadingLastEmail] = useState(false);
+  const [lastEmailCategories, setLastEmailCategories] = useState<string[] | null>(null);
   
   const batchedAnalysis = new BatchedContactAnalysis();
   const emailTemplatesRef = useRef<HTMLDivElement>(null);
@@ -226,16 +227,13 @@ function App() {
 
   useEffect(() => {
     if (progress) {
-      console.log('📊 Progress state updated:', progress);
+      // Keep for debugging if needed
+      // console.log('📊 Progress state updated:', progress);
     }
   }, [progress]);
 
   useEffect(() => {
-    if (isAnalyzing) {
-      console.log('🔄 Analysis started, isAnalyzing:', isAnalyzing);
-    } else {
-      console.log('✅ Analysis completed, isAnalyzing:', isAnalyzing);
-    }
+    // console.log('Analysis state changed:', isAnalyzing);
   }, [isAnalyzing]);
 
   const handleAuthenticated = async (userInfo: { displayName: string; mail: string; id: string }) => {
@@ -271,9 +269,11 @@ function App() {
     setSelectedContactForDetails(contact);
     setIsLoadingLastEmail(true);
     setLastEmailHtml(null);
+    setLastEmailCategories(null);
     try {
       const msg = await graphService.getLastEmailWithContact(contact.email);
       setLastEmailHtml(msg?.html ?? null);
+      setLastEmailCategories((msg && Array.isArray((msg as any).categories)) ? (msg as any).categories : null);
     } finally {
       setIsLoadingLastEmail(false);
     }
@@ -289,8 +289,8 @@ function App() {
     }
   };
 
-  const handleSaveDraft = (draft: { subject: string; body: string; htmlBody: string }) => {
-    console.log('Draft saved:', draft);
+  const handleSaveDraft = (_draft: { subject: string; body: string; htmlBody: string }) => {
+    // console.log('Draft saved:', draft);
     setShowEditor(false);
     setSelectedContact(null);
     setSelectedTemplate(null);
@@ -298,7 +298,7 @@ function App() {
 
   const handleSendEmail = async (email: { subject: string; body: string; htmlBody: string; to: string }) => {
     try {
-      console.log('Sending email via Graph API:', email);
+      // console.log('Sending email via Graph API:', email);
       
       // Use the Graph API to send the email
       await graphService.sendEmail(email.to, email.subject, email.htmlBody, true);
@@ -351,7 +351,7 @@ function App() {
     });
     
     try {
-      console.log(`Fetching real data from Microsoft Graph (${mode} mode)...`);
+      // console.log(`Fetching real data from Microsoft Graph (${mode} mode)...`);
       
       await graphService.debugAuthStatus();
       
@@ -360,7 +360,7 @@ function App() {
         throw new Error('No access token available. Please sign in again.');
       }
       
-      console.log('Access token confirmed, fetching data...');
+      // console.log('Access token confirmed, fetching data...');
       
       let analysisOptions;
       let emailInteractionLimit;
@@ -376,7 +376,7 @@ function App() {
           emailInteractionLimit = 50000; // All within bounds
       }
       
-      console.log('Fetching contacts and email interactions...');
+      // console.log('Fetching contacts and email interactions...');
       
       setProgress({
         stage: 'preparing_analysis',
@@ -391,8 +391,8 @@ function App() {
         graphService.getEmailInteractionsForAnalysis(emailInteractionLimit)
       ]);
 
-      console.log('Data fetch complete, starting analysis...');
-      console.log(`Analyzing ${realContacts.length} contacts with ${realEmailInteractions.length} email interactions`);
+      // console.log('Data fetch complete, starting analysis...');
+      // console.log(`Analyzing ${realContacts.length} contacts with ${realEmailInteractions.length} email interactions`);
       
       setProgress({
         stage: 'preparing_analysis',
@@ -402,13 +402,13 @@ function App() {
         totalItems: realContacts.length
       });
       
-      console.log('Starting batched analysis with callbacks...');
+      // console.log('Starting batched analysis with callbacks...');
       
       const batchSize = batchedAnalysis.getRecommendedBatchSize(realContacts.length);
       // Increase concurrency for better performance
       const maxConcurrent = realContacts.length > 5000 ? 4 : realContacts.length > 1000 ? 3 : 2;
       
-      console.log(`Using batch size: ${batchSize}, max concurrent: ${maxConcurrent} for ${realContacts.length} contacts`);
+      // console.log(`Using batch size: ${batchSize}, max concurrent: ${maxConcurrent} for ${realContacts.length} contacts`);
       
       const analyzedContacts = await batchedAnalysis.analyzeContactsInBatches(
         realContacts,
@@ -417,11 +417,11 @@ function App() {
           batchSize,
           maxConcurrentBatches: maxConcurrent,
           onProgress: (update) => {
-            console.log('✅ App: Received progress update:', JSON.stringify(update, null, 2));
+            // console.log('✅ App: Received progress update:', JSON.stringify(update, null, 2));
             setProgress(update);
           },
           onComplete: () => {
-            console.log('✅ Batched analysis completed successfully');
+            // console.log('✅ Batched analysis completed successfully');
           },
           onError: (error) => {
             console.error('❌ Batched analysis failed:', error);
@@ -431,7 +431,7 @@ function App() {
       );
       
       setContacts(analyzedContacts);
-      console.log('Contact analysis completed successfully');
+      // console.log('Contact analysis completed successfully');
       
       // Ensure progress shows as complete before finishing
       setProgress({
@@ -555,7 +555,7 @@ function App() {
                 </div>
                 
                 <div className="h-full max-h-80 overflow-y-auto">
-                  <ContactList contacts={filteredContacts} onDraftEmail={handleDraftEmail} />
+                  <ContactList contacts={filteredContacts} onDraftEmail={handleDraftEmail} onViewEmail={handleShowContactDetails} />
                 </div>
               </div>
             </div>
@@ -605,6 +605,15 @@ function App() {
                   {selectedContactForDetails.name}
                 </h3>
                 <p className="text-xs text-gray-600 truncate">{selectedContactForDetails.email}</p>
+                {lastEmailCategories && lastEmailCategories.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {lastEmailCategories.map((cat) => (
+                      <span key={cat} className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-50 text-indigo-700 border border-indigo-100">
+                        {cat}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
               <button
                 onClick={() => setSelectedContactForDetails(null)}
@@ -661,6 +670,15 @@ function App() {
             <div className="flex-1 overflow-y-auto p-3">
               <div className="mb-3">
                 <h4 className="text-sm font-semibold text-gray-900 mb-2">Last Email</h4>
+                {lastEmailCategories && lastEmailCategories.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mb-2">
+                    {lastEmailCategories.map((cat) => (
+                      <span key={cat} className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-50 text-indigo-700 border border-indigo-100">
+                        {cat}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
               
               {isLoadingLastEmail ? (
