@@ -92,6 +92,9 @@ export class MicrosoftGraphService {
    */
   async signIn(): Promise<AuthenticationResult | null> {
     try {
+      // Ensure MSAL is initialized before signing in
+      await this.ensureInitialized();
+
       const loginRequest = {
         scopes: this.config.scopes,
         prompt: 'select_account' as const,
@@ -139,13 +142,13 @@ export class MicrosoftGraphService {
     console.log('=== AUTH DEBUG INFO ===');
     console.log('MSAL Instance initialized:', !!this.msalInstance);
     console.log('Config:', this.config);
-    
+
     const accounts = this.msalInstance.getAllAccounts();
     console.log('Accounts found:', accounts.length);
-    
+
     if (accounts.length > 0) {
       console.log('Current account:', accounts[0].username);
-      
+
       try {
         const token = await this.getAccessToken();
         console.log('Access token available:', !!token);
@@ -160,13 +163,34 @@ export class MicrosoftGraphService {
   }
 
   /**
+   * Ensure MSAL is initialized before making API calls
+   */
+  private async ensureInitialized(): Promise<void> {
+    try {
+      // Check if already initialized by trying to access accounts
+      // If this throws an error, we need to initialize
+      this.msalInstance.getAllAccounts();
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('uninitialized_public_client_application')) {
+        console.log('MSAL not initialized, initializing now...');
+        await this.initialize();
+      } else {
+        throw error;
+      }
+    }
+  }
+
+  /**
    * Get access token for API calls
    */
   async getAccessToken(): Promise<string | null> {
     try {
+      // Ensure MSAL is initialized before making any API calls
+      await this.ensureInitialized();
+
       const accounts = this.msalInstance.getAllAccounts();
       console.log(`Found ${accounts.length} accounts`);
-      
+
       if (accounts.length === 0) {
         console.log('No accounts found, user needs to sign in');
         return null;
@@ -284,24 +308,105 @@ export class MicrosoftGraphService {
 
   /**
    * Get the most recent email (subject + HTML body) exchanged with a contact
+   * Uses client-side filtering since Graph API filtering appears to be restricted
    */
   async getLastEmailWithContact(contactEmail: string): Promise<{ subject: string; html: string; receivedDateTime: string } | null> {
     try {
-      // Use $filter with exact address match and order by most recent
-      const safeEmail = contactEmail.replace(/'/g, "''");
-      const endpoint = `/me/messages?$filter=(from/emailAddress/address eq '${safeEmail}') or (toRecipients/any(r:r/emailAddress/address eq '${safeEmail}'))&$orderby=receivedDateTime desc&$top=1&$select=subject,body,receivedDateTime,from,toRecipients`;
-      const response = await this.makeGraphApiCall<{ value: Array<{ subject: string; body: { contentType: string; content: string }; receivedDateTime: string }> }>(
-        endpoint
-      );
-      const msg = response.value?.[0];
-      if (!msg) return null;
-      const isHtml = (msg.body?.contentType || '').toLowerCase() === 'html';
-      const html = isHtml ? (msg.body?.content || '') : (msg.body?.content || '').replace(/\n/g, '<br/>');
-      return { subject: msg.subject || 'No Subject', html, receivedDateTime: msg.receivedDateTime };
+      console.log('Getting last email for contact:', contactEmail);
+      const normalizedEmail = contactEmail.toLowerCase().trim();
+
+      // Fetch recent emails without filtering (since $filter queries return 400)
+      // We'll filter client-side instead
+      const recentEmails = await this.getRecentEmailsForClientFiltering();
+      
+      // Find emails that involve this contact
+      const relevantEmails = recentEmails.filter(email => {
+        const fromEmail = email.from?.emailAddress?.address?.toLowerCase() || '';
+        const toEmails = (email.toRecipients || []).map((r: any) => r.emailAddress?.address?.toLowerCase() || '');
+        
+        return fromEmail === normalizedEmail || toEmails.includes(normalizedEmail);
+      });
+
+      if (relevantEmails.length > 0) {
+        // Sort by most recent
+        relevantEmails.sort((a, b) => {
+          const dateA = new Date(a.receivedDateTime).getTime();
+          const dateB = new Date(b.receivedDateTime).getTime();
+          return dateB - dateA;
+        });
+
+        console.log(`Found ${relevantEmails.length} emails with ${contactEmail}`);
+        return this.formatEmailForDisplay(relevantEmails[0]);
+      }
+
+      console.log('No emails found for contact:', contactEmail);
+      return null;
     } catch (error) {
       console.error('Failed to get last email for contact:', error);
       return null;
     }
+  }
+
+  /**
+   * Get recent emails without filtering for client-side processing
+   */
+  private async getRecentEmailsForClientFiltering(): Promise<any[]> {
+    try {
+      // Fetch recent emails from inbox and sent items
+      // Try to include body content - if it works with current permissions, great!
+      // If not, we'll just get metadata
+      const inboxEndpoint = `/me/messages?$top=100&$orderby=receivedDateTime desc&$select=id,subject,receivedDateTime,from,toRecipients,body`;
+      const sentEndpoint = `/me/mailFolders/sentitems/messages?$top=100&$orderby=receivedDateTime desc&$select=id,subject,receivedDateTime,from,toRecipients,body`;
+
+      console.log('Fetching recent emails for client-side filtering...');
+
+      const [inboxResponse, sentResponse] = await Promise.all([
+        this.makeGraphApiCall<{ value: any[] }>(inboxEndpoint).catch(() => ({ value: [] })),
+        this.makeGraphApiCall<{ value: any[] }>(sentEndpoint).catch(() => ({ value: [] }))
+      ]);
+
+      const allEmails = [...(inboxResponse.value || []), ...(sentResponse.value || [])];
+      console.log(`Fetched ${allEmails.length} recent emails for filtering`);
+      
+      return allEmails;
+    } catch (error) {
+      console.error('Failed to fetch recent emails:', error);
+      return [];
+    }
+  }
+
+
+  /**
+   * Format email for display
+   */
+  private formatEmailForDisplay(email: any): { subject: string; html: string; receivedDateTime: string } {
+    const subject = email.subject || 'No Subject';
+    const receivedDateTime = email.receivedDateTime;
+
+    // Check if we have body content
+    let html = '';
+    
+    if (email.body && email.body.content) {
+      // We have body content! Use it
+      const isHtml = (email.body.contentType || '').toLowerCase() === 'html';
+      html = isHtml ? email.body.content : email.body.content.replace(/\n/g, '<br/>');
+      console.log('✅ Email body content available!');
+    } else {
+      // No body content - show basic info
+      html = `<div class="email-preview bg-blue-50 p-4 rounded-lg border border-blue-200">
+        <p class="mb-2"><strong>Subject:</strong> ${subject}</p>
+        <p class="mb-2"><strong>Date:</strong> ${new Date(receivedDateTime).toLocaleString()}</p>
+        <p class="text-sm text-gray-600 mt-3">
+          <em>📧 Email body content is not available. Your current Mail.Read permission allows basic email metadata.</em>
+        </p>
+        <p class="text-xs text-gray-500 mt-2">
+          To see full email content, ensure your organization allows Graph API body access.
+        </p>
+      </div>`;
+      console.log('ℹ️ Email body not available - showing metadata only');
+    }
+
+    return { subject, html, receivedDateTime };
   }
 
   /**
