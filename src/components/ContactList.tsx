@@ -4,9 +4,10 @@ interface ContactListProps {
   contacts: ContactWithAnalysis[];
   onDraftEmail: (contact: ContactWithAnalysis) => void;
   onViewEmail?: (contact: ContactWithAnalysis) => void;
+  onSnooze?: (contact: ContactWithAnalysis, days: number) => void;
 }
 
-export function ContactList({ contacts, onDraftEmail, onViewEmail }: ContactListProps) {
+export function ContactList({ contacts, onDraftEmail, onViewEmail, onSnooze }: ContactListProps) {
 
   const getCategoryColor = (category: ContactWithAnalysis['category']) => {
     switch (category) {
@@ -56,7 +57,7 @@ export function ContactList({ contacts, onDraftEmail, onViewEmail }: ContactList
                     </span>
                   </div>
                 </div>
-                <div className="flex flex-col gap-1">
+                <div className="flex flex-col gap-1 items-end">
                   {onViewEmail && (
                     <button 
                       onClick={() => onViewEmail(contact)}
@@ -71,6 +72,18 @@ export function ContactList({ contacts, onDraftEmail, onViewEmail }: ContactList
                   >
                     Draft
                   </button>
+                  {onSnooze && (
+                    <div className="relative">
+                      <details>
+                        <summary className="list-none cursor-pointer text-xs text-gray-600 hover:text-gray-800 px-2 py-1 rounded hover:bg-gray-100">Snooze ▾</summary>
+                        <div className="absolute right-0 mt-1 bg-white border rounded shadow-sm z-10 text-xs">
+                          <button className="block px-3 py-1 hover:bg-gray-50 w-full text-left" onClick={(e) => { e.preventDefault(); onSnooze(contact, 7); }}>7 days</button>
+                          <button className="block px-3 py-1 hover:bg-gray-50 w-full text-left" onClick={(e) => { e.preventDefault(); onSnooze(contact, 14); }}>14 days</button>
+                          <button className="block px-3 py-1 hover:bg-gray-50 w-full text-left" onClick={(e) => { e.preventDefault(); onSnooze(contact, 30); }}>30 days</button>
+                        </div>
+                      </details>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

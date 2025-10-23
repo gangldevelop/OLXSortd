@@ -216,6 +216,42 @@ function App() {
   const [isLoadingLastEmail, setIsLoadingLastEmail] = useState(false);
   const [lastEmailCategories, setLastEmailCategories] = useState<string[] | null>(null);
   
+  // Snooze map persisted locally: email -> ISO date string
+  const [snoozedUntilByEmail, setSnoozedUntilByEmail] = useState<Record<string, string>>({});
+  
+  const loadSnoozes = () => {
+    try {
+      const raw = localStorage.getItem('olx_snoozed_until');
+      return raw ? (JSON.parse(raw) as Record<string, string>) : {};
+    } catch {
+      return {};
+    }
+  };
+  
+  const saveSnoozes = (map: Record<string, string>) => {
+    localStorage.setItem('olx_snoozed_until', JSON.stringify(map));
+  };
+  
+  useEffect(() => {
+    setSnoozedUntilByEmail(loadSnoozes());
+  }, []);
+  
+  const isEmailSnoozed = (email: string) => {
+    const iso = snoozedUntilByEmail[email];
+    if (!iso) return false;
+    return new Date(iso).getTime() > Date.now();
+  };
+  
+  const handleSnoozeContact = (contact: ContactWithAnalysis, days: number) => {
+    const until = new Date();
+    until.setDate(until.getDate() + days);
+    const updated = { ...snoozedUntilByEmail, [contact.email]: until.toISOString() };
+    setSnoozedUntilByEmail(updated);
+    saveSnoozes(updated);
+    // Immediately re-apply filtering after snooze
+    setFilteredContacts((prev) => prev.filter(c => c.email !== contact.email));
+  };
+  
   const batchedAnalysis = new BatchedContactAnalysis();
   const emailTemplatesRef = useRef<HTMLDivElement>(null);
 
@@ -328,14 +364,18 @@ function App() {
   };
 
   // Filter contacts based on selected category
-  const categoryFilteredContacts = selectedCategory 
+  const baseContacts = selectedCategory 
     ? contacts.filter(contact => contact.category === selectedCategory)
     : contacts;
+  
+  // Apply snooze filter (hide snoozed)
+  const visibleContacts = baseContacts.filter(c => !isEmailSnoozed(c.email));
 
-  // Update filtered contacts when category changes
+  // Update filtered contacts when inputs change (avoid depending on array identity)
   useEffect(() => {
-    setFilteredContacts(categoryFilteredContacts);
-  }, [categoryFilteredContacts]);
+    setFilteredContacts(visibleContacts);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contacts, selectedCategory, snoozedUntilByEmail]);
 
   const analyzeContacts = async (mode: 'quick' | 'balanced' | 'comprehensive' = 'quick') => {
     setIsAnalyzing(true);
@@ -525,7 +565,7 @@ function App() {
               <div className="bg-blue-50 border border-blue-200 rounded p-2">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-blue-800">
-                    Showing {selectedCategory} contacts ({filteredContacts.length} of {categoryFilteredContacts.length})
+                    Showing {selectedCategory} contacts ({filteredContacts.length} of {baseContacts.length})
                   </span>
                   <button 
                     onClick={() => handleCategoryClick(null)}
@@ -547,7 +587,7 @@ function App() {
                 {/* Search and Filter Controls */}
                 <div className="mb-3">
                   <ContactSearch 
-                    contacts={categoryFilteredContacts}
+                    contacts={visibleContacts}
                     onFilteredContacts={setFilteredContacts}
                     placeholder={`Search ${selectedCategory || 'all'} contacts...`}
                     showAdvancedFilters={true}
@@ -555,7 +595,7 @@ function App() {
                 </div>
                 
                 <div className="h-full max-h-80 overflow-y-auto">
-                  <ContactList contacts={filteredContacts} onDraftEmail={handleDraftEmail} onViewEmail={handleShowContactDetails} />
+                  <ContactList contacts={filteredContacts} onDraftEmail={handleDraftEmail} onViewEmail={handleShowContactDetails} onSnooze={handleSnoozeContact} />
                 </div>
               </div>
             </div>
