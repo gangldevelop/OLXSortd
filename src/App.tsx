@@ -50,6 +50,10 @@ function AnalysisSummary({ contacts, onCategoryClick, onDraftEmail, onShowContac
     setNeedsAttentionContacts(contactsNeedingAttention);
   }, [contactsNeedingAttention]);
 
+  // Snooze handler will be injected from parent via a global function reference
+  // We keep a no-op fallback to satisfy types when not set yet
+  const snoozeFromSummary = (window as any).__olxSnoozeContact__ as undefined | ((c: ContactWithAnalysis, days: number) => void);
+
   return (
     <div className="space-y-3">
           {/* Compact Analysis Summary */}
@@ -179,16 +183,28 @@ function AnalysisSummary({ contacts, onCategoryClick, onDraftEmail, onShowContac
                       </span>
                     </div>
                   </div>
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDraftEmail(contact);
-                    }}
-                    className="text-xs text-primary-600 hover:text-primary-700 font-medium px-2 py-1 hover:bg-primary-50 rounded transition-colors ml-2"
-                    title="Draft email to this contact"
-                  >
-                    Draft
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <div className="relative" onClick={(e) => e.stopPropagation()}>
+                      <details>
+                        <summary className="list-none cursor-pointer text-xs text-gray-600 hover:text-gray-800 px-2 py-1 rounded hover:bg-gray-100">Snooze ▾</summary>
+                        <div className="absolute right-0 mt-1 bg-white border rounded shadow-sm z-10 text-xs">
+                          <button className="block px-3 py-1 hover:bg-gray-50 w-full text-left" onClick={(e) => { e.preventDefault(); snoozeFromSummary?.(contact, 7); }}>7 days</button>
+                          <button className="block px-3 py-1 hover:bg-gray-50 w-full text-left" onClick={(e) => { e.preventDefault(); snoozeFromSummary?.(contact, 14); }}>14 days</button>
+                          <button className="block px-3 py-1 hover:bg-gray-50 w-full text-left" onClick={(e) => { e.preventDefault(); snoozeFromSummary?.(contact, 30); }}>30 days</button>
+                        </div>
+                      </details>
+                    </div>
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDraftEmail(contact);
+                      }}
+                      className="text-xs text-primary-600 hover:text-primary-700 font-medium px-2 py-1 hover:bg-primary-50 rounded transition-colors ml-2"
+                      title="Draft email to this contact"
+                    >
+                      Draft
+                    </button>
+                  </div>
                 </div>
               );
             })}
@@ -248,9 +264,10 @@ function App() {
     const updated = { ...snoozedUntilByEmail, [contact.email]: until.toISOString() };
     setSnoozedUntilByEmail(updated);
     saveSnoozes(updated);
-    // Immediately re-apply filtering after snooze
     setFilteredContacts((prev) => prev.filter(c => c.email !== contact.email));
   };
+  // Expose snooze handler for AnalysisSummary rendering scope
+  (window as any).__olxSnoozeContact__ = handleSnoozeContact;
   
   const batchedAnalysis = new BatchedContactAnalysis();
   const emailTemplatesRef = useRef<HTMLDivElement>(null);
