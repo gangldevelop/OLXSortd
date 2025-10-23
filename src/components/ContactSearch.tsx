@@ -50,16 +50,17 @@ export function ContactSearch({
     // Search term filter
     if (filterOptions.searchTerm.trim()) {
       const searchLower = filterOptions.searchTerm.toLowerCase();
-      filtered = filtered.filter(contact => 
-        contact.name.toLowerCase().includes(searchLower) ||
-        contact.email.toLowerCase().includes(searchLower)
-      );
+      filtered = filtered.filter(contact => {
+        const nameLower = (contact.name || '').toLowerCase();
+        const emailLower = (contact.email || '').toLowerCase();
+        return nameLower.includes(searchLower) || emailLower.includes(searchLower);
+      });
     }
 
     // Response rate filter
     filtered = filtered.filter(contact => 
-      contact.responseRate * 100 >= filterOptions.responseRateRange[0] &&
-      contact.responseRate * 100 <= filterOptions.responseRateRange[1]
+      ((contact.responseRate ?? 0) * 100) >= filterOptions.responseRateRange[0] &&
+      ((contact.responseRate ?? 0) * 100) <= filterOptions.responseRateRange[1]
     );
 
     // Last contact filter
@@ -67,9 +68,7 @@ export function ContactSearch({
       const now = Date.now();
       filtered = filtered.filter(contact => {
         if (!contact.lastContactDate) return filterOptions.lastContactFilter === 'never';
-        
         const daysSince = Math.floor((now - contact.lastContactDate.getTime()) / (24 * 60 * 60 * 1000));
-        
         switch (filterOptions.lastContactFilter) {
           case 'never': return !contact.lastContactDate;
           case 'recent': return daysSince <= 7;
@@ -82,45 +81,50 @@ export function ContactSearch({
 
     // Email count filter
     filtered = filtered.filter(contact => 
-      contact.emailCount >= filterOptions.emailCountRange[0] &&
-      contact.emailCount <= filterOptions.emailCountRange[1]
+      (contact.emailCount ?? 0) >= filterOptions.emailCountRange[0] &&
+      (contact.emailCount ?? 0) <= filterOptions.emailCountRange[1]
     );
 
     // Sorting
     filtered.sort((a, b) => {
       let comparison = 0;
+
+      const aName = (a.name || '');
+      const bName = (b.name || '');
+      const aEmailCount = a.emailCount ?? 0;
+      const bEmailCount = b.emailCount ?? 0;
+      const aTime = a.lastContactDate?.getTime() || 0;
+      const bTime = b.lastContactDate?.getTime() || 0;
+      const aResp = a.responseRate ?? 0;
+      const bResp = b.responseRate ?? 0;
       
       switch (filterOptions.sortBy) {
         case 'name':
-          comparison = a.name.localeCompare(b.name);
+          comparison = aName.localeCompare(bName);
           // For names, we always want A-Z order (ascending)
           return comparison;
           
         case 'emailCount':
-          comparison = a.emailCount - b.emailCount;
+          comparison = aEmailCount - bEmailCount;
           // For email count, 'desc' means highest first (more emails = more important)
           return filterOptions.sortOrder === 'desc' ? -comparison : comparison;
           
         case 'lastContact':
-          const aTime = a.lastContactDate?.getTime() || 0;
-          const bTime = b.lastContactDate?.getTime() || 0;
           comparison = bTime - aTime; // More recent first (higher timestamp)
           // For last contact, 'desc' means most recent first
           return filterOptions.sortOrder === 'desc' ? comparison : -comparison;
           
         case 'responseRate':
-          comparison = b.responseRate - a.responseRate; // Higher response rate first
+          comparison = bResp - aResp; // Higher response rate first
           // For response rate, 'desc' means highest first
           return filterOptions.sortOrder === 'desc' ? comparison : -comparison;
           
         case 'default':
         default:
           // Smart default: response rate first (highest), then recency (most recent)
-          if (a.responseRate !== b.responseRate) {
-            comparison = b.responseRate - a.responseRate; // Higher response rate first
+          if (aResp !== bResp) {
+            comparison = bResp - aResp; // Higher response rate first
           } else {
-            const aTime = a.lastContactDate?.getTime() || 0;
-            const bTime = b.lastContactDate?.getTime() || 0;
             comparison = bTime - aTime; // More recent first
           }
           return comparison; // Smart sort always uses desc order (best first)

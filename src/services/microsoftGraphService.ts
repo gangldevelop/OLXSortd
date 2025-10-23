@@ -1,6 +1,8 @@
 import { PublicClientApplication } from '@azure/msal-browser';
 import type { AuthenticationResult, AccountInfo } from '@azure/msal-browser';
 
+const DEBUG_GRAPH = import.meta.env.VITE_DEBUG_GRAPH === 'true';
+
 interface GraphApiConfig {
   clientId: string;
   authority: string;
@@ -54,12 +56,14 @@ export class MicrosoftGraphService {
     };
 
     // Debug logging
-    console.log('MSAL Configuration:', {
-      clientId: this.config.clientId,
-      authority: this.config.authority,
-      redirectUri: this.config.redirectUri,
-      scopes: this.config.scopes
-    });
+    if (DEBUG_GRAPH) {
+      console.log('MSAL Configuration:', {
+        clientId: this.config.clientId,
+        authority: this.config.authority,
+        redirectUri: this.config.redirectUri,
+        scopes: this.config.scopes
+      });
+    }
 
     this.msalInstance = new PublicClientApplication({
       auth: {
@@ -80,7 +84,7 @@ export class MicrosoftGraphService {
   async initialize(): Promise<void> {
     try {
       await this.msalInstance.initialize();
-      console.log('MSAL initialized successfully');
+      if (DEBUG_GRAPH) console.log('MSAL initialized successfully');
     } catch (error) {
       console.error('Failed to initialize MSAL:', error);
       throw error;
@@ -92,13 +96,16 @@ export class MicrosoftGraphService {
    */
   async signIn(): Promise<AuthenticationResult | null> {
     try {
+      // Ensure MSAL is initialized before signing in
+      await this.ensureInitialized();
+
       const loginRequest = {
         scopes: this.config.scopes,
         prompt: 'select_account' as const,
       };
 
       const response = await this.msalInstance.loginPopup(loginRequest);
-      console.log('User signed in successfully');
+      if (DEBUG_GRAPH) console.log('User signed in successfully');
       return response;
     } catch (error) {
       console.error('Sign in failed:', error);
@@ -116,7 +123,7 @@ export class MicrosoftGraphService {
         await this.msalInstance.logoutPopup({
           account: accounts[0],
         });
-        console.log('User signed out successfully');
+        if (DEBUG_GRAPH) console.log('User signed out successfully');
       }
     } catch (error) {
       console.error('Sign out failed:', error);
@@ -136,16 +143,17 @@ export class MicrosoftGraphService {
    * Debug method to check authentication status
    */
   async debugAuthStatus(): Promise<void> {
+    if (!DEBUG_GRAPH) return;
     console.log('=== AUTH DEBUG INFO ===');
     console.log('MSAL Instance initialized:', !!this.msalInstance);
     console.log('Config:', this.config);
-    
+
     const accounts = this.msalInstance.getAllAccounts();
     console.log('Accounts found:', accounts.length);
-    
+
     if (accounts.length > 0) {
       console.log('Current account:', accounts[0].username);
-      
+
       try {
         const token = await this.getAccessToken();
         console.log('Access token available:', !!token);
@@ -160,15 +168,36 @@ export class MicrosoftGraphService {
   }
 
   /**
+   * Ensure MSAL is initialized before making API calls
+   */
+  private async ensureInitialized(): Promise<void> {
+    try {
+      // Check if already initialized by trying to access accounts
+      // If this throws an error, we need to initialize
+      this.msalInstance.getAllAccounts();
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('uninitialized_public_client_application')) {
+        if (DEBUG_GRAPH) console.log('MSAL not initialized, initializing now...');
+        await this.initialize();
+      } else {
+        throw error;
+      }
+    }
+  }
+
+  /**
    * Get access token for API calls
    */
   async getAccessToken(): Promise<string | null> {
     try {
+      // Ensure MSAL is initialized before making any API calls
+      await this.ensureInitialized();
+
       const accounts = this.msalInstance.getAllAccounts();
-      console.log(`Found ${accounts.length} accounts`);
-      
+      if (DEBUG_GRAPH) console.log(`Found ${accounts.length} accounts`);
+
       if (accounts.length === 0) {
-        console.log('No accounts found, user needs to sign in');
+        if (DEBUG_GRAPH) console.log('No accounts found, user needs to sign in');
         return null;
       }
 
@@ -177,15 +206,15 @@ export class MicrosoftGraphService {
         account: accounts[0],
       };
 
-      console.log('Attempting to acquire token silently...');
+      if (DEBUG_GRAPH) console.log('Attempting to acquire token silently...');
       const response = await this.msalInstance.acquireTokenSilent(silentRequest);
-      console.log('Token acquired successfully');
+      if (DEBUG_GRAPH) console.log('Token acquired successfully');
       return response.accessToken;
     } catch (error) {
       console.error('Failed to get access token:', error);
       // Try interactive login if silent fails
       try {
-        console.log('Attempting interactive login...');
+        if (DEBUG_GRAPH) console.log('Attempting interactive login...');
         const response = await this.signIn();
         return response?.accessToken || null;
       } catch (loginError) {
@@ -255,6 +284,78 @@ export class MicrosoftGraphService {
   }
 
   /**
+   * Fetch a single message by ID with categories and body
+   * Also tries extended properties as a fallback for custom categories
+   */
+  private async getMessageById(messageId: string): Promise<any> {
+    const safeId = encodeURIComponent(messageId);
+
+    // 1) Fetch the base message first (include conversationId for fallback)
+    const baseEndpoint = `/me/messages/${safeId}?$select=id,subject,receivedDateTime,from,toRecipients,body,categories,conversationId`;
+    const message = await this.makeGraphApiCall<any>(baseEndpoint, 'GET', undefined, {
+      Prefer: 'outlook.body-content-type="html"'
+    });
+
+    // If categories already present, return
+    if (Array.isArray(message?.categories) && message.categories.length > 0) {
+      return message;
+    }
+
+    // 2) Try multi-value extended properties (some tenants store categories here)
+    try {
+      const mvEndpoint = `/me/messages/${safeId}/multiValueExtendedProperties?$filter=id eq 'String {00020329-0000-0000-C000-000000000046} Name Categories' or id eq 'String {00020329-0000-0000-C000-000000000046} Name Keywords'`;
+      const mv = await this.makeGraphApiCall<{ value?: Array<{ id: string; value?: string[] }> }>(mvEndpoint);
+      const mvValues = mv?.value?.find(p => p.id.includes('Name Categories') || p.id.includes('Name Keywords'))?.value;
+      if (Array.isArray(mvValues) && mvValues.length > 0) {
+        if (DEBUG_GRAPH) console.log('Categories via multiValueExtendedProperties:', mvValues);
+        message.categories = mvValues.map(v => (v ?? '').toString().trim()).filter(Boolean);
+        return message;
+      }
+    } catch (e) {
+      if (DEBUG_GRAPH) console.log('multiValueExtendedProperties fetch failed:', e);
+    }
+
+    // 3) Try single-value extended properties (comma/semicolon separated)
+    try {
+      const svEndpoint = `/me/messages/${safeId}/singleValueExtendedProperties?$filter=id eq 'String {00020329-0000-0000-C000-000000000046} Name Categories' or id eq 'String {00020329-0000-0000-C000-000000000046} Name Keywords'`;
+      const sv = await this.makeGraphApiCall<{ value?: Array<{ id: string; value?: string }> }>(svEndpoint);
+      const raw = sv?.value?.find(p => p.id.includes('Name Categories') || p.id.includes('Name Keywords'))?.value;
+      if (typeof raw === 'string' && raw.trim().length > 0) {
+        const parsed = raw.split(/[,;]+/).map(s => s.trim()).filter(Boolean);
+        if (parsed.length > 0) {
+          if (DEBUG_GRAPH) console.log('Categories via singleValueExtendedProperties:', parsed);
+          message.categories = parsed;
+          return message;
+        }
+      }
+    } catch (e) {
+      if (DEBUG_GRAPH) console.log('singleValueExtendedProperties fetch failed:', e);
+    }
+
+    // 4) Conversation fallback: union categories from other messages in same conversation
+    try {
+      if (message?.conversationId) {
+        const convId = message.conversationId.replace(/'/g, "''");
+        const convEndpoint = `/me/messages?$filter=conversationId eq '${convId}'&$top=25&$select=id,categories`;
+        const conv = await this.makeGraphApiCall<{ value?: Array<{ id: string; categories?: string[] }> }>(convEndpoint);
+        const allCats = new Set<string>();
+        (conv.value || []).forEach(m => (m.categories || []).forEach(c => allCats.add(c)));
+        if (allCats.size > 0) {
+          const derived = Array.from(allCats);
+          if (DEBUG_GRAPH) console.log('Categories via conversation fallback:', derived);
+          message.categories = derived;
+          return message;
+        }
+      }
+    } catch (e) {
+      if (DEBUG_GRAPH) console.log('conversation categories fetch failed:', e);
+    }
+
+    // Return base message if nothing was found
+    return message;
+  }
+
+  /**
    * Get user's contacts
    */
   async getContacts(): Promise<EmailContact[]> {
@@ -284,24 +385,197 @@ export class MicrosoftGraphService {
 
   /**
    * Get the most recent email (subject + HTML body) exchanged with a contact
+   * Uses client-side filtering since Graph API filtering appears to be restricted
    */
-  async getLastEmailWithContact(contactEmail: string): Promise<{ subject: string; html: string; receivedDateTime: string } | null> {
+  async getLastEmailWithContact(contactEmail: string): Promise<{ subject: string; html: string; receivedDateTime: string, categories?: string[] } | null> {
     try {
-      // Use $filter with exact address match and order by most recent
-      const safeEmail = contactEmail.replace(/'/g, "''");
-      const endpoint = `/me/messages?$filter=(from/emailAddress/address eq '${safeEmail}') or (toRecipients/any(r:r/emailAddress/address eq '${safeEmail}'))&$orderby=receivedDateTime desc&$top=1&$select=subject,body,receivedDateTime,from,toRecipients`;
-      const response = await this.makeGraphApiCall<{ value: Array<{ subject: string; body: { contentType: string; content: string }; receivedDateTime: string }> }>(
-        endpoint
-      );
-      const msg = response.value?.[0];
-      if (!msg) return null;
-      const isHtml = (msg.body?.contentType || '').toLowerCase() === 'html';
-      const html = isHtml ? (msg.body?.content || '') : (msg.body?.content || '').replace(/\n/g, '<br/>');
-      return { subject: msg.subject || 'No Subject', html, receivedDateTime: msg.receivedDateTime };
+      console.log('Getting last email for contact:', contactEmail);
+      const normalizedEmail = contactEmail.toLowerCase().trim();
+
+      // Fetch recent emails without filtering (since $filter queries return 400)
+      // We'll filter client-side instead
+      const recentEmails = await this.getRecentEmailsForClientFiltering();
+      
+      // Find emails that involve this contact
+      let relevantEmails = recentEmails.filter(email => {
+        const fromEmail = email.from?.emailAddress?.address?.toLowerCase() || '';
+        const toEmails = (email.toRecipients || []).map((r: any) => r.emailAddress?.address?.toLowerCase() || '');
+        
+        return fromEmail === normalizedEmail || toEmails.includes(normalizedEmail);
+      });
+
+      if (relevantEmails.length > 0) {
+        // Sort by most recent
+        relevantEmails.sort((a, b) => {
+          const dateA = new Date(a.receivedDateTime).getTime();
+          const dateB = new Date(b.receivedDateTime).getTime();
+          return dateB - dateA;
+        });
+
+        let chosen = relevantEmails[0];
+        console.log('Categories on chosen recent email:', Array.isArray(chosen?.categories) ? chosen.categories : 'none');
+
+        // If categories are empty but Outlook shows them, fetch full message by id as fallback
+        if (!Array.isArray(chosen.categories) || chosen.categories.length === 0) {
+          try {
+            const full = await this.getMessageById(chosen.id);
+            if (full) {
+              // Merge details prioritizing full response fields
+              chosen = { ...chosen, ...full };
+            }
+          } catch (e) {
+            if (DEBUG_GRAPH) console.log('Fallback fetch by id failed:', e);
+          }
+        }
+        return this.formatEmailForDisplay(chosen);
+      }
+
+      // Fallback: paginate older messages until a match is found or safety limit reached
+      console.log('No emails in first 200. Falling back to paginated search...');
+      let match = await this.findEmailWithContactPaginated(normalizedEmail, 1000);
+      if (match) {
+        console.log('Categories on chosen paged email:', Array.isArray(match?.categories) ? match.categories : 'none');
+        // If missing categories, try full fetch by id as well
+        if (!Array.isArray(match.categories) || match.categories.length === 0) {
+          try {
+            const full = await this.getMessageById(match.id);
+            if (full) {
+              match = { ...match, ...full };
+            }
+          } catch (e) {
+            if (DEBUG_GRAPH) console.log('Fallback fetch by id (paged) failed:', e);
+          }
+        }
+        return this.formatEmailForDisplay(match);
+      }
+
+      console.log('No emails found for contact:', contactEmail);
+      return null;
     } catch (error) {
       console.error('Failed to get last email for contact:', error);
       return null;
     }
+  }
+
+  /**
+   * Paginate through messages (inbox + sent) and search client-side for a contact
+   * safetyLimit caps total messages scanned per folder to avoid excessive calls
+   */
+  private async findEmailWithContactPaginated(normalizedEmail: string, safetyLimit: number = 1000): Promise<any | null> {
+    // We will iterate over both inbox and sent in parallel pages: 50 per request
+    const pageSize = 50;
+
+    const buildEndpoint = (folder: 'inbox' | 'sentitems', skip: number) =>
+      folder === 'inbox'
+        ? `/me/messages?$skip=${skip}&$top=${pageSize}&$orderby=receivedDateTime desc&$select=id,subject,receivedDateTime,from,toRecipients,body,categories`
+        : `/me/mailFolders/sentitems/messages?$skip=${skip}&$top=${pageSize}&$orderby=receivedDateTime desc&$select=id,subject,receivedDateTime,from,toRecipients,body,categories`;
+
+    for (let scanned = 0; scanned < safetyLimit; scanned += pageSize) {
+      try {
+        const [inboxPage, sentPage] = await Promise.all([
+          this.makeGraphApiCall<{ value: any[] }>(buildEndpoint('inbox', scanned)).catch(() => ({ value: [] })),
+          this.makeGraphApiCall<{ value: any[] }>(buildEndpoint('sentitems', scanned)).catch(() => ({ value: [] }))
+        ]);
+
+        const batch = [...(inboxPage.value || []), ...(sentPage.value || [])];
+        if (DEBUG_GRAPH) console.log(`Paged search scanned=${scanned + pageSize}, batch size=${batch.length}`);
+        if (batch.length === 0) {
+          // No more messages
+          break;
+        }
+
+        const found = batch.find(email => {
+          const fromEmail = email.from?.emailAddress?.address?.toLowerCase() || '';
+          const toEmails = (email.toRecipients || []).map((r: any) => r.emailAddress?.address?.toLowerCase() || '');
+          return fromEmail === normalizedEmail || toEmails.includes(normalizedEmail);
+        });
+
+        if (found) {
+          if (DEBUG_GRAPH) console.log(`Found match in paginated search after scanning ${scanned + pageSize} messages.`);
+          return found;
+        }
+      } catch (err) {
+        if (DEBUG_GRAPH) console.log('Paginated search page failed, continuing:', err);
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Get recent emails without filtering for client-side processing
+   */
+  private async getRecentEmailsForClientFiltering(): Promise<any[]> {
+    try {
+      // Fetch recent emails from inbox and sent items
+      // Try to include body content - if it works with current permissions, great!
+      // If not, we'll just get metadata
+      const inboxEndpoint = `/me/messages?$top=100&$orderby=receivedDateTime desc&$select=id,subject,receivedDateTime,from,toRecipients,body,categories`;
+      const sentEndpoint = `/me/mailFolders/sentitems/messages?$top=100&$orderby=receivedDateTime desc&$select=id,subject,receivedDateTime,from,toRecipients,body,categories`;
+
+      if (DEBUG_GRAPH) console.log('Fetching recent emails for client-side filtering...');
+
+      const [inboxResponse, sentResponse] = await Promise.all([
+        this.makeGraphApiCall<{ value: any[] }>(inboxEndpoint).catch(() => ({ value: [] })),
+        this.makeGraphApiCall<{ value: any[] }>(sentEndpoint).catch(() => ({ value: [] }))
+      ]);
+
+      const allEmails = [...(inboxResponse.value || []), ...(sentResponse.value || [])];
+      if (DEBUG_GRAPH) console.log(`Fetched ${allEmails.length} recent emails for filtering`);
+      
+      return allEmails;
+    } catch (error) {
+      console.error('Failed to fetch recent emails:', error);
+      return [];
+    }
+  }
+
+
+  /**
+   * Format email for display
+   */
+  private formatEmailForDisplay(email: any): { subject: string; html: string; receivedDateTime: string, categories?: string[] } {
+    const subject = email.subject || 'No Subject';
+    const receivedDateTime = email.receivedDateTime;
+
+    if (DEBUG_GRAPH) console.log('=== FORMAT EMAIL FOR DISPLAY ===');
+    if (DEBUG_GRAPH) console.log('Email subject:', subject);
+    if (DEBUG_GRAPH) console.log('Email categories:', email?.categories);
+    if (DEBUG_GRAPH) console.log('Categories type:', typeof email?.categories);
+    if (DEBUG_GRAPH) console.log('Categories isArray:', Array.isArray(email?.categories));
+    if (DEBUG_GRAPH) console.log('================================');
+
+    // Check if we have body content
+    let html = '';
+    
+    if (email.body && email.body.content) {
+      // We have body content! Use it
+      const isHtml = (email.body.contentType || '').toLowerCase() === 'html';
+      html = isHtml ? email.body.content : email.body.content.replace(/\n/g, '<br/>');
+      if (DEBUG_GRAPH) console.log('✅ Email body content available!');
+    } else {
+      // No body content - show basic info
+      html = `<div class="email-preview bg-blue-50 p-4 rounded-lg border border-blue-200">
+        <p class="mb-2"><strong>Subject:</strong> ${subject}</p>
+        <p class="mb-2"><strong>Date:</strong> ${new Date(receivedDateTime).toLocaleString()}</p>
+        <p class="text-sm text-gray-600 mt-3">
+          <em>📧 Email body content is not available. Your current Mail.Read permission allows basic email metadata.</em>
+        </p>
+        <p class="text-xs text-gray-500 mt-2">
+          To see full email content, ensure your organization allows Graph API body access.
+        </p>
+      </div>`;
+      if (DEBUG_GRAPH) console.log('ℹ️ Email body not available - showing metadata only');
+    }
+
+    const result = { 
+      subject, 
+      html, 
+      receivedDateTime, 
+      categories: Array.isArray(email.categories) ? email.categories : undefined 
+    };
+    if (DEBUG_GRAPH) console.log('Returning from formatEmailForDisplay, categories:', result.categories);
+    return result;
   }
 
   /**

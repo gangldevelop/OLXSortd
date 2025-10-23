@@ -3,9 +3,10 @@ import type { ContactWithAnalysis } from '../types/contact';
 interface ContactListProps {
   contacts: ContactWithAnalysis[];
   onDraftEmail: (contact: ContactWithAnalysis) => void;
+  onViewEmail?: (contact: ContactWithAnalysis) => void;
 }
 
-export function ContactList({ contacts, onDraftEmail }: ContactListProps) {
+export function ContactList({ contacts, onDraftEmail, onViewEmail }: ContactListProps) {
 
   const getCategoryColor = (category: ContactWithAnalysis['category']) => {
     switch (category) {
@@ -55,12 +56,22 @@ export function ContactList({ contacts, onDraftEmail }: ContactListProps) {
                     </span>
                   </div>
                 </div>
-                <button 
-                  onClick={() => onDraftEmail(contact)}
-                  className="text-xs text-primary-600 hover:text-primary-700 font-medium px-2 py-1 hover:bg-primary-50 rounded transition-colors"
-                >
-                  Draft
-                </button>
+                <div className="flex flex-col gap-1">
+                  {onViewEmail && (
+                    <button 
+                      onClick={() => onViewEmail(contact)}
+                      className="text-xs text-blue-600 hover:text-blue-700 font-medium px-2 py-1 hover:bg-blue-50 rounded transition-colors"
+                    >
+                      View
+                    </button>
+                  )}
+                  <button 
+                    onClick={() => onDraftEmail(contact)}
+                    className="text-xs text-primary-600 hover:text-primary-700 font-medium px-2 py-1 hover:bg-primary-50 rounded transition-colors"
+                  >
+                    Draft
+                  </button>
+                </div>
               </div>
             </div>
           ))}

@@ -214,6 +214,7 @@ function App() {
   const [selectedContactForDetails, setSelectedContactForDetails] = useState<ContactWithAnalysis | null>(null);
   const [lastEmailHtml, setLastEmailHtml] = useState<string | null>(null);
   const [isLoadingLastEmail, setIsLoadingLastEmail] = useState(false);
+  const [lastEmailCategories, setLastEmailCategories] = useState<string[] | null>(null);
   
   const batchedAnalysis = new BatchedContactAnalysis();
   const emailTemplatesRef = useRef<HTMLDivElement>(null);
@@ -226,21 +227,26 @@ function App() {
 
   useEffect(() => {
     if (progress) {
-      console.log('📊 Progress state updated:', progress);
+      // Keep for debugging if needed
+      // console.log('📊 Progress state updated:', progress);
     }
   }, [progress]);
 
   useEffect(() => {
-    if (isAnalyzing) {
-      console.log('🔄 Analysis started, isAnalyzing:', isAnalyzing);
-    } else {
-      console.log('✅ Analysis completed, isAnalyzing:', isAnalyzing);
-    }
+    // console.log('Analysis state changed:', isAnalyzing);
   }, [isAnalyzing]);
 
-  const handleAuthenticated = (userInfo: { displayName: string; mail: string; id: string }) => {
+  const handleAuthenticated = async (userInfo: { displayName: string; mail: string; id: string }) => {
     setUser(userInfo);
     setIsAuthenticated(true);
+
+    // Ensure MSAL is initialized after authentication
+    try {
+      await graphService.initialize();
+      console.log('MSAL initialized successfully in App component');
+    } catch (error) {
+      console.error('Failed to initialize MSAL in App component:', error);
+    }
   };
 
   const handleDraftEmail = (contact: ContactWithAnalysis) => {
@@ -263,9 +269,11 @@ function App() {
     setSelectedContactForDetails(contact);
     setIsLoadingLastEmail(true);
     setLastEmailHtml(null);
+    setLastEmailCategories(null);
     try {
       const msg = await graphService.getLastEmailWithContact(contact.email);
       setLastEmailHtml(msg?.html ?? null);
+      setLastEmailCategories((msg && Array.isArray((msg as any).categories)) ? (msg as any).categories : null);
     } finally {
       setIsLoadingLastEmail(false);
     }
@@ -281,8 +289,8 @@ function App() {
     }
   };
 
-  const handleSaveDraft = (draft: { subject: string; body: string; htmlBody: string }) => {
-    console.log('Draft saved:', draft);
+  const handleSaveDraft = (_draft: { subject: string; body: string; htmlBody: string }) => {
+    // console.log('Draft saved:', draft);
     setShowEditor(false);
     setSelectedContact(null);
     setSelectedTemplate(null);
@@ -290,7 +298,7 @@ function App() {
 
   const handleSendEmail = async (email: { subject: string; body: string; htmlBody: string; to: string }) => {
     try {
-      console.log('Sending email via Graph API:', email);
+      // console.log('Sending email via Graph API:', email);
       
       // Use the Graph API to send the email
       await graphService.sendEmail(email.to, email.subject, email.htmlBody, true);
@@ -343,7 +351,7 @@ function App() {
     });
     
     try {
-      console.log(`Fetching real data from Microsoft Graph (${mode} mode)...`);
+      // console.log(`Fetching real data from Microsoft Graph (${mode} mode)...`);
       
       await graphService.debugAuthStatus();
       
@@ -352,7 +360,7 @@ function App() {
         throw new Error('No access token available. Please sign in again.');
       }
       
-      console.log('Access token confirmed, fetching data...');
+      // console.log('Access token confirmed, fetching data...');
       
       let analysisOptions;
       let emailInteractionLimit;
@@ -368,7 +376,7 @@ function App() {
           emailInteractionLimit = 50000; // All within bounds
       }
       
-      console.log('Fetching contacts and email interactions...');
+      // console.log('Fetching contacts and email interactions...');
       
       setProgress({
         stage: 'preparing_analysis',
@@ -383,8 +391,8 @@ function App() {
         graphService.getEmailInteractionsForAnalysis(emailInteractionLimit)
       ]);
 
-      console.log('Data fetch complete, starting analysis...');
-      console.log(`Analyzing ${realContacts.length} contacts with ${realEmailInteractions.length} email interactions`);
+      // console.log('Data fetch complete, starting analysis...');
+      // console.log(`Analyzing ${realContacts.length} contacts with ${realEmailInteractions.length} email interactions`);
       
       setProgress({
         stage: 'preparing_analysis',
@@ -394,13 +402,13 @@ function App() {
         totalItems: realContacts.length
       });
       
-      console.log('Starting batched analysis with callbacks...');
+      // console.log('Starting batched analysis with callbacks...');
       
       const batchSize = batchedAnalysis.getRecommendedBatchSize(realContacts.length);
       // Increase concurrency for better performance
       const maxConcurrent = realContacts.length > 5000 ? 4 : realContacts.length > 1000 ? 3 : 2;
       
-      console.log(`Using batch size: ${batchSize}, max concurrent: ${maxConcurrent} for ${realContacts.length} contacts`);
+      // console.log(`Using batch size: ${batchSize}, max concurrent: ${maxConcurrent} for ${realContacts.length} contacts`);
       
       const analyzedContacts = await batchedAnalysis.analyzeContactsInBatches(
         realContacts,
@@ -409,11 +417,11 @@ function App() {
           batchSize,
           maxConcurrentBatches: maxConcurrent,
           onProgress: (update) => {
-            console.log('✅ App: Received progress update:', JSON.stringify(update, null, 2));
+            // console.log('✅ App: Received progress update:', JSON.stringify(update, null, 2));
             setProgress(update);
           },
           onComplete: () => {
-            console.log('✅ Batched analysis completed successfully');
+            // console.log('✅ Batched analysis completed successfully');
           },
           onError: (error) => {
             console.error('❌ Batched analysis failed:', error);
@@ -423,7 +431,7 @@ function App() {
       );
       
       setContacts(analyzedContacts);
-      console.log('Contact analysis completed successfully');
+      // console.log('Contact analysis completed successfully');
       
       // Ensure progress shows as complete before finishing
       setProgress({
@@ -547,7 +555,7 @@ function App() {
                 </div>
                 
                 <div className="h-full max-h-80 overflow-y-auto">
-                  <ContactList contacts={filteredContacts} onDraftEmail={handleDraftEmail} />
+                  <ContactList contacts={filteredContacts} onDraftEmail={handleDraftEmail} onViewEmail={handleShowContactDetails} />
                 </div>
               </div>
             </div>
@@ -586,48 +594,122 @@ function App() {
               )}
             </div>
           </div>
-      {/* Email Details Modal */}
+      {/* Email Details Modal - Outlook Add-in Optimized */}
       {selectedContactForDetails && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-hidden">
-            <div className="flex items-center justify-between p-4 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">
-                Last Email with {selectedContactForDetails.name}
-              </h3>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2">
+          <div className="bg-white rounded-lg w-full max-w-sm max-h-[95vh] overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50">
+              <div className="flex-1 min-w-0">
+                <h3 className="text-lg font-semibold text-gray-900 truncate">
+                  {selectedContactForDetails.name}
+                </h3>
+                <p className="text-xs text-gray-600 truncate">{selectedContactForDetails.email}</p>
+                {lastEmailCategories && lastEmailCategories.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {lastEmailCategories.map((cat) => (
+                      <span key={cat} className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-50 text-indigo-700 border border-indigo-100">
+                        {cat}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
               <button
                 onClick={() => setSelectedContactForDetails(null)}
-                className="text-gray-400 hover:text-gray-600 text-xl"
+                className="text-gray-400 hover:text-gray-600 text-xl font-light hover:bg-gray-200 rounded-full w-6 h-6 flex items-center justify-center transition-colors ml-2 flex-shrink-0"
               >
                 ×
               </button>
             </div>
             
-            <div className="p-4 overflow-y-auto max-h-[60vh]">
-              {isLoadingLastEmail ? (
-                <div className="text-sm text-gray-500">Loading last email…</div>
-              ) : lastEmailHtml ? (
-                <div className="prose max-w-none text-sm" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(lastEmailHtml) }} />
-              ) : (
-                <div className="text-sm text-gray-500">No email body available</div>
-              )}
-              <div className="mt-4 bg-gray-50 p-3 rounded">
-                <div className="text-sm font-medium text-gray-900 mb-2">Contact Info</div>
-                <div className="text-sm text-gray-700">
-                  <div>Email: {selectedContactForDetails.email}</div>
-                  <div>Category: {selectedContactForDetails.category}</div>
-                  <div>Total Emails: {selectedContactForDetails.emailCount}</div>
-                  <div>Response Rate: {Math.round(selectedContactForDetails.responseRate * 100)}%</div>
-                  {selectedContactForDetails.lastContactDate && (
-                    <div>Last Contact: {selectedContactForDetails.lastContactDate.toLocaleDateString()}</div>
-                  )}
+            {/* Contact Info Cards - Compact */}
+            <div className="p-3 bg-gray-50 border-b border-gray-200">
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="bg-white p-2 rounded border border-gray-200">
+                  <div className="text-gray-500 font-medium">Category</div>
+                  <div className="mt-1">
+                    <span className={`px-1.5 py-0.5 rounded-full text-xs font-medium ${
+                      selectedContactForDetails.category === 'frequent' ? 'bg-green-100 text-green-800' :
+                      selectedContactForDetails.category === 'warm' ? 'bg-yellow-100 text-yellow-800' :
+                      selectedContactForDetails.category === 'hot' ? 'bg-red-100 text-red-800' :
+                      selectedContactForDetails.category === 'cold' ? 'bg-gray-100 text-gray-800' :
+                      'bg-orange-100 text-orange-800'
+                    }`}>
+                      {selectedContactForDetails.category}
+                    </span>
+                  </div>
                 </div>
+                
+                <div className="bg-white p-2 rounded border border-gray-200">
+                  <div className="text-gray-500 font-medium">Emails</div>
+                  <div className="text-sm font-semibold text-gray-900 mt-1">
+                    {selectedContactForDetails.emailCount}
+                  </div>
+                </div>
+                
+                <div className="bg-white p-2 rounded border border-gray-200">
+                  <div className="text-gray-500 font-medium">Response Rate</div>
+                  <div className="text-sm font-semibold text-gray-900 mt-1">
+                    {Math.round(selectedContactForDetails.responseRate * 100)}%
+                  </div>
+                </div>
+                
+                {selectedContactForDetails.lastContactDate && (
+                  <div className="bg-white p-2 rounded border border-gray-200">
+                    <div className="text-gray-500 font-medium">Last Contact</div>
+                    <div className="text-xs text-gray-900 mt-1">
+                      {selectedContactForDetails.lastContactDate.toLocaleDateString()}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
             
-            <div className="flex justify-end gap-2 p-4 border-t border-gray-200">
+            {/* Email Content - Scrollable */}
+            <div className="flex-1 overflow-y-auto p-3">
+              <div className="mb-3">
+                <h4 className="text-sm font-semibold text-gray-900 mb-2">Last Email</h4>
+                {lastEmailCategories && lastEmailCategories.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mb-2">
+                    {lastEmailCategories.map((cat) => (
+                      <span key={cat} className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-50 text-indigo-700 border border-indigo-100">
+                        {cat}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+              
+              {isLoadingLastEmail ? (
+                <div className="flex items-center justify-center h-24">
+                  <div className="text-gray-500 text-center">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-600 mx-auto mb-2"></div>
+                    <div className="text-xs">Loading email…</div>
+                  </div>
+                </div>
+              ) : lastEmailHtml ? (
+                <div className="bg-white border border-gray-200 rounded p-3 shadow-sm">
+                  <div 
+                    className="prose prose-xs max-w-none text-gray-800 leading-relaxed" 
+                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(lastEmailHtml) }} 
+                  />
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-24 text-gray-500">
+                  <div className="text-center">
+                    <div className="text-2xl mb-1">📧</div>
+                    <div className="text-xs">No email available</div>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            {/* Footer - Compact */}
+            <div className="flex gap-2 p-3 border-t border-gray-200 bg-gray-50">
               <button
                 onClick={() => setSelectedContactForDetails(null)}
-                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
+                className="flex-1 px-3 py-2 text-xs text-gray-600 hover:text-gray-800 transition-colors border border-gray-300 rounded hover:bg-gray-100"
               >
                 Close
               </button>
@@ -636,7 +718,7 @@ function App() {
                   setSelectedContactForDetails(null);
                   handleDraftEmail(selectedContactForDetails);
                 }}
-                className="px-4 py-2 text-sm bg-primary-600 text-white rounded hover:bg-primary-700 transition-colors"
+                className="flex-1 px-3 py-2 text-xs bg-primary-600 text-white rounded hover:bg-primary-700 transition-colors font-medium"
               >
                 Draft Email
               </button>
