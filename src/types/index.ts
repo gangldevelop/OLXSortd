@@ -1,3 +1,10 @@
+import type { ContactCategory } from './contact';
+
+export const CONTACT_CATEGORIES = ['frequent', 'inactive', 'warm', 'hot', 'cold'] as const;
+export type { ContactCategory } from './contact';
+
+export const SNOOZE_DURATIONS = [7, 14, 30] as const;
+
 export interface Contact {
   id: string;
   email: string;
@@ -11,7 +18,6 @@ export interface Contact {
   tags: string[];
 }
 
-export type ContactCategory = 'frequent' | 'inactive' | 'cold' | 'warm' | 'hot';
 
 export interface EmailTemplate {
   id: string;
