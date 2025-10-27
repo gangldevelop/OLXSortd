@@ -169,7 +169,7 @@ function App() {
             
             {/* Category Filter Indicator */}
             {selectedCategory && (
-              <div className="bg-blue-50 border border-blue-200 rounded p-2">
+              <div className="bg-blue-50 border border-blue-200 rounded p-1.5">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-blue-800">
                     Showing {selectedCategory} contacts ({filteredContacts.length} of {baseContacts.length})
@@ -186,13 +186,13 @@ function App() {
             
             {/* Contacts Section - Fixed height with scrolling */}
             <div className="flex-1 min-h-0">
-              <div className="bg-white rounded border p-3">
+              <div className="bg-white rounded border p-2">
                 <h3 className="text-sm font-semibold text-gray-900 mb-3">
                   {selectedCategory ? `${selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)} Contacts` : 'All Contacts'} ({filteredContacts.length})
                 </h3>
                 
                 {/* Search and Filter Controls */}
-                <div className="mb-3">
+                <div className="mb-2">
                   <ContactSearch 
                     contacts={visibleContacts}
                     onFilteredContacts={setFilteredContacts}
@@ -208,7 +208,7 @@ function App() {
             </div>
 
             {/* Email Templates/Composer Section */}
-            <div ref={emailTemplatesRef} className="space-y-3">
+            <div ref={emailTemplatesRef} className="space-y-2">
               {selectedContact && (
                 <EmailComposer
                   contact={selectedContact}
