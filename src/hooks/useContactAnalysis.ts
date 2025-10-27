@@ -88,6 +88,23 @@ export function useContactAnalysis(onContactsAnalyzed: (contacts: ContactWithAna
       });
 
       await new Promise((resolve) => setTimeout(resolve, 500));
+
+      // Background prefetch: warm last-email previews for top contacts to speed first open
+      try {
+        const topForPreview = analyzedContacts.slice(0, 20);
+        // Light concurrency to avoid throttling
+        const concurrency = 2;
+        for (let i = 0; i < topForPreview.length; i += concurrency) {
+          const chunk = topForPreview.slice(i, i + concurrency);
+          // Fire and forget
+          void Promise.all(
+            chunk.map((c) => graphService.getLastEmailWithContact(c.email).catch(() => null))
+          );
+          // small gap to be gentle on Graph
+          // eslint-disable-next-line no-await-in-loop
+          await new Promise((r) => setTimeout(r, 100));
+        }
+      } catch {}
     } catch (error) {
       console.error('Failed to analyze contacts:', error);
       alert(`Failed to load your contacts and emails: ${error instanceof Error ? error.message : 'Unknown error'}`);

@@ -22,7 +22,7 @@ interface EmailContact {
 interface EmailMessage {
   id: string;
   subject: string;
-  body: {
+  body?: {
     content: string;
     contentType: 'text' | 'html';
   };
@@ -46,6 +46,8 @@ interface EmailMessage {
 export class MicrosoftGraphService {
   private msalInstance: PublicClientApplication;
   private config: GraphApiConfig;
+  private lastEmailCache: Map<string, { subject: string; html: string; receivedDateTime: string; categories?: string[]; cachedAt: number }> = new Map();
+  private static readonly PREVIEW_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
   constructor() {
     this.config = {
@@ -254,33 +256,54 @@ export class MicrosoftGraphService {
       options.body = JSON.stringify(body);
     }
 
-    try {
-      const response = await fetch(url, options);
-      
-      if (!response.ok) {
-        throw new Error(`Graph API call failed: ${response.status} ${response.statusText}`);
+    const maxRetries = 5;
+    let attempt = 0;
+    let lastError: unknown;
+
+    while (attempt <= maxRetries) {
+      try {
+        const response = await fetch(url, options);
+
+        if (response.status === 429 || response.status === 503 || response.status === 504) {
+          const retryAfter = Number(response.headers.get('Retry-After')) || Math.min(1000 * Math.pow(2, attempt), 10000);
+          if (DEBUG_GRAPH) console.warn(`Graph throttled (${response.status}). Retrying in ${retryAfter}ms... (attempt ${attempt + 1}/${maxRetries})`);
+          await new Promise(r => setTimeout(r, retryAfter));
+          attempt++;
+          continue;
+        }
+
+        if (!response.ok) {
+          throw new Error(`Graph API call failed: ${response.status} ${response.statusText}`);
+        }
+
+        const status = response.status;
+        const contentLength = response.headers.get('content-length');
+        const contentType = response.headers.get('content-type') || '';
+        const hasBody = contentLength === null || contentLength === undefined || contentLength === '' || Number(contentLength) > 0;
+
+        if (status === 202 || status === 204 || !hasBody) {
+          return undefined as unknown as T;
+        }
+
+        if (contentType.includes('application/json')) {
+          return (await response.json()) as T;
+        }
+
+        return (await response.text()) as unknown as T;
+      } catch (error) {
+        lastError = error;
+        if (attempt >= maxRetries) {
+          console.error('Graph API call failed:', error);
+          throw error;
+        }
+        const backoff = Math.min(500 * Math.pow(2, attempt), 5000);
+        if (DEBUG_GRAPH) console.warn(`Graph call error. Retrying in ${backoff}ms... (attempt ${attempt + 1}/${maxRetries})`);
+        await new Promise(r => setTimeout(r, backoff));
+        attempt++;
       }
-
-      // Some Graph endpoints (e.g., /me/sendMail) return 202/204 with no body
-      const status = response.status;
-      const contentLength = response.headers.get('content-length');
-      const contentType = response.headers.get('content-type') || '';
-      const hasBody = contentLength === null || contentLength === undefined || contentLength === '' || Number(contentLength) > 0;
-
-      if (status === 202 || status === 204 || !hasBody) {
-        return undefined as unknown as T;
-      }
-
-      if (contentType.includes('application/json')) {
-        return (await response.json()) as T;
-      }
-
-      // Fallback to text for non-JSON responses
-      return (await response.text()) as unknown as T;
-    } catch (error) {
-      console.error('Graph API call failed:', error);
-      throw error;
     }
+
+    throw lastError instanceof Error ? lastError : new Error('Graph API call failed');
   }
 
   /**
@@ -356,11 +379,30 @@ export class MicrosoftGraphService {
   }
 
   /**
+   * Fetch only essential fields for a message body quickly
+   */
+  private async getMessageBodyQuick(messageId: string): Promise<{ id: string; subject?: string; receivedDateTime?: string; body?: { content: string; contentType: 'text' | 'html' } } | null> {
+    try {
+      const safeId = encodeURIComponent(messageId);
+      const endpoint = `/me/messages/${safeId}?$select=id,subject,receivedDateTime,body`;
+      const msg = await this.makeGraphApiCall<any>(endpoint, 'GET', undefined, {
+        Prefer: 'outlook.body-content-type="html"'
+      });
+      return msg || null;
+    } catch (e) {
+      if (DEBUG_GRAPH) console.log('getMessageBodyQuick failed:', e);
+      return null;
+    }
+  }
+
+  /**
    * Get user's contacts
    */
   async getContacts(): Promise<EmailContact[]> {
     try {
-      const response = await this.makeGraphApiCall<{ value: EmailContact[] }>('/me/contacts');
+      const response = await this.makeGraphApiCall<{ value: EmailContact[] }>(
+        '/me/contacts?$select=id,displayName,emailAddresses'
+      );
       return response.value;
     } catch (error) {
       console.error('Failed to get contacts:', error);
@@ -374,7 +416,7 @@ export class MicrosoftGraphService {
   async getEmailMessages(folder: 'inbox' | 'sentitems' = 'inbox', limit: number = 50): Promise<EmailMessage[]> {
     try {
       const response = await this.makeGraphApiCall<{ value: EmailMessage[] }>(
-        `/me/mailFolders/${folder}/messages?$top=${limit}&$orderby=receivedDateTime desc`
+        `/me/mailFolders/${folder}/messages?$top=${limit}&$orderby=receivedDateTime desc&$select=id,subject,receivedDateTime,from,toRecipients,isRead`
       );
       return response.value;
     } catch (error) {
@@ -389,8 +431,57 @@ export class MicrosoftGraphService {
    */
   async getLastEmailWithContact(contactEmail: string): Promise<{ subject: string; html: string; receivedDateTime: string, categories?: string[] } | null> {
     try {
+      // Cache check
+      const key = contactEmail.toLowerCase().trim();
+      const cached = this.lastEmailCache.get(key);
+      if (cached && Date.now() - cached.cachedAt < MicrosoftGraphService.PREVIEW_TTL_MS) {
+        if (DEBUG_GRAPH) console.log('Using cached last email preview for', key);
+        return { subject: cached.subject, html: cached.html, receivedDateTime: cached.receivedDateTime, categories: cached.categories };
+      }
+
       console.log('Getting last email for contact:', contactEmail);
       const normalizedEmail = contactEmail.toLowerCase().trim();
+
+      // Fastest path: direct filter for from/to address (if tenant allows)
+      try {
+        const filter = `(from/emailAddress/address eq '${normalizedEmail}' or toRecipients/any(r:r/emailAddress/address eq '${normalizedEmail}'))`;
+        const filterEndpoint = `/me/messages?$top=1&$orderby=receivedDateTime desc&$filter=${encodeURIComponent(filter)}&$select=id,subject,receivedDateTime,from,toRecipients,categories`;
+        const filtered = await this.makeGraphApiCall<{ value?: any[] }>(filterEndpoint, 'GET', undefined, { 'ConsistencyLevel': 'eventual' });
+        const hit = (filtered.value || [])[0];
+        if (hit) {
+          const body = await this.getMessageBodyQuick(hit.id);
+          const chosen = { ...hit, ...body };
+          const preview = this.formatEmailForDisplay(chosen);
+          this.lastEmailCache.set(key, { ...preview, cachedAt: Date.now() });
+          return preview;
+        }
+      } catch (e) {
+        if (DEBUG_GRAPH) console.log('Direct filter path failed, falling back to search:', e);
+      }
+
+      // Fast path: Graph $search to find recent messages referencing the address
+      // Requires header: ConsistencyLevel: eventual
+      try {
+        const searchQuery = `"${normalizedEmail}"`;
+        const searchEndpoint = `/me/messages?$search=${encodeURIComponent(searchQuery)}&$top=5&$select=id,subject,receivedDateTime,from,toRecipients,categories,bodyPreview`;
+        const searchResp = await this.makeGraphApiCall<{ value?: any[] }>(searchEndpoint, 'GET', undefined, { 'ConsistencyLevel': 'eventual' });
+        const hits = (searchResp.value || []).sort((a, b) => new Date(b.receivedDateTime).getTime() - new Date(a.receivedDateTime).getTime());
+        const direct = hits.find(m => {
+          const fromEmail = m.from?.emailAddress?.address?.toLowerCase() || '';
+          const toEmails = (m.toRecipients || []).map((r: any) => r.emailAddress?.address?.toLowerCase() || '');
+          return fromEmail === normalizedEmail || toEmails.includes(normalizedEmail);
+        }) || hits[0];
+        if (direct) {
+          // Fetch body quickly for preview
+          const body = await this.getMessageBodyQuick(direct.id);
+          const chosen = { ...direct, ...body };
+          const preview = this.formatEmailForDisplay(chosen);
+          this.lastEmailCache.set(key, { ...preview, cachedAt: Date.now() });
+          return preview;
+        }
+      } catch (e) {
+        if (DEBUG_GRAPH) console.log('Search fast path failed, falling back:', e);
+      }
 
       // Fetch recent emails without filtering (since $filter queries return 400)
       // We'll filter client-side instead
@@ -415,19 +506,16 @@ export class MicrosoftGraphService {
         let chosen = relevantEmails[0];
         console.log('Categories on chosen recent email:', Array.isArray(chosen?.categories) ? chosen.categories : 'none');
 
-        // If categories are empty but Outlook shows them, fetch full message by id as fallback
-        if (!Array.isArray(chosen.categories) || chosen.categories.length === 0) {
-          try {
-            const full = await this.getMessageById(chosen.id);
-            if (full) {
-              // Merge details prioritizing full response fields
-              chosen = { ...chosen, ...full };
-            }
-          } catch (e) {
-            if (DEBUG_GRAPH) console.log('Fallback fetch by id failed:', e);
+        // Fetch body quickly for preview
+        try {
+          const full = await this.getMessageBodyQuick(chosen.id);
+          if (full) {
+            chosen = { ...chosen, ...full };
           }
-        }
-        return this.formatEmailForDisplay(chosen);
+        } catch {}
+        const preview = this.formatEmailForDisplay(chosen);
+        this.lastEmailCache.set(key, { ...preview, cachedAt: Date.now() });
+        return preview;
       }
 
       // Fallback: paginate older messages until a match is found or safety limit reached
@@ -435,18 +523,18 @@ export class MicrosoftGraphService {
       let match = await this.findEmailWithContactPaginated(normalizedEmail, 1000);
       if (match) {
         console.log('Categories on chosen paged email:', Array.isArray(match?.categories) ? match.categories : 'none');
-        // If missing categories, try full fetch by id as well
-        if (!Array.isArray(match.categories) || match.categories.length === 0) {
-          try {
-            const full = await this.getMessageById(match.id);
-            if (full) {
-              match = { ...match, ...full };
-            }
-          } catch (e) {
-            if (DEBUG_GRAPH) console.log('Fallback fetch by id (paged) failed:', e);
+        // Fetch body quickly for preview
+        try {
+          const full = await this.getMessageBodyQuick(match.id);
+          if (full) {
+            match = { ...match, ...full };
           }
+        } catch (e) {
+          if (DEBUG_GRAPH) console.log('Fallback fetch by id (paged) failed:', e);
         }
-        return this.formatEmailForDisplay(match);
+        const preview = this.formatEmailForDisplay(match);
+        this.lastEmailCache.set(key, { ...preview, cachedAt: Date.now() });
+        return preview;
       }
 
       console.log('No emails found for contact:', contactEmail);
@@ -467,8 +555,8 @@ export class MicrosoftGraphService {
 
     const buildEndpoint = (folder: 'inbox' | 'sentitems', skip: number) =>
       folder === 'inbox'
-        ? `/me/messages?$skip=${skip}&$top=${pageSize}&$orderby=receivedDateTime desc&$select=id,subject,receivedDateTime,from,toRecipients,body,categories`
-        : `/me/mailFolders/sentitems/messages?$skip=${skip}&$top=${pageSize}&$orderby=receivedDateTime desc&$select=id,subject,receivedDateTime,from,toRecipients,body,categories`;
+        ? `/me/messages?$skip=${skip}&$top=${pageSize}&$orderby=receivedDateTime desc&$select=id,subject,receivedDateTime,from,toRecipients,categories`
+        : `/me/mailFolders/sentitems/messages?$skip=${skip}&$top=${pageSize}&$orderby=receivedDateTime desc&$select=id,subject,receivedDateTime,from,toRecipients,categories`;
 
     for (let scanned = 0; scanned < safetyLimit; scanned += pageSize) {
       try {
@@ -616,12 +704,12 @@ export class MicrosoftGraphService {
         
         // Get sent emails from this period
         const sentResponse = await this.makeGraphApiCall<{ value: EmailMessage[] }>(
-          `/me/mailFolders/sentitems/messages?$top=1000&$filter=sentDateTime ge ${cutoffDateStr}&$orderby=sentDateTime desc`
+          `/me/mailFolders/sentitems/messages?$top=1000&$filter=sentDateTime ge ${cutoffDateStr}&$orderby=sentDateTime desc&$select=id,subject,sentDateTime,receivedDateTime,from,toRecipients`
         );
         
         // Get received emails from this period  
         const receivedResponse = await this.makeGraphApiCall<{ value: EmailMessage[] }>(
-          `/me/mailFolders/inbox/messages?$top=1000&$filter=receivedDateTime ge ${cutoffDateStr}&$orderby=receivedDateTime desc`
+          `/me/mailFolders/inbox/messages?$top=1000&$filter=receivedDateTime ge ${cutoffDateStr}&$orderby=receivedDateTime desc&$select=id,subject,receivedDateTime,from,toRecipients,isRead`
         );
         
         // Process sent emails
@@ -708,7 +796,7 @@ export class MicrosoftGraphService {
         const cutoffDateStr = cutoffDate.toISOString();
         
         const response = await this.makeGraphApiCall<{ value: EmailMessage[] }>(
-          `/me/mailFolders/${folder}/messages?$top=100&$filter=receivedDateTime ge ${cutoffDateStr}&$orderby=receivedDateTime desc`
+          `/me/mailFolders/${folder}/messages?$top=100&$filter=receivedDateTime ge ${cutoffDateStr}&$orderby=receivedDateTime desc&$select=id,subject,receivedDateTime,from,toRecipients,isRead`
         );
         
         allEmails.push(...response.value);
