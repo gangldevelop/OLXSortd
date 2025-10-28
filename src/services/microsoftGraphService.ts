@@ -48,6 +48,7 @@ export class MicrosoftGraphService {
   private config: GraphApiConfig;
   private lastEmailCache: Map<string, { subject: string; html: string; receivedDateTime: string; categories?: string[]; cachedAt: number }> = new Map();
   private static readonly PREVIEW_TTL_MS = 5 * 60 * 1000; // 5 minutes
+  private isOutlookHost: boolean = false;
 
   constructor() {
     this.config = {
@@ -78,6 +79,14 @@ export class MicrosoftGraphService {
         storeAuthStateInCookie: false,
       },
     });
+
+    // Detect Outlook host if Office.js is available
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const w: any = typeof window !== 'undefined' ? window : undefined;
+      this.isOutlookHost = !!(w && w.Office && w.Office.context && w.Office.context.mailbox);
+      if (DEBUG_GRAPH) console.log('Detected Outlook host:', this.isOutlookHost);
+    } catch {}
   }
 
   /**
@@ -90,6 +99,59 @@ export class MicrosoftGraphService {
     } catch (error) {
       console.error('Failed to initialize MSAL:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Attempt silent SSO when running inside Outlook add-in using mailbox user as login hint.
+   * Returns true if a token is acquired silently and an account is cached.
+   */
+  async tryOutlookAutoSignIn(): Promise<boolean> {
+    try {
+      await this.ensureInitialized();
+
+      if (!this.isOutlookHost) {
+        return false;
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const w: any = window as any;
+      const mailbox = w?.Office?.context?.mailbox;
+      const userEmail: string | undefined = mailbox?.userProfile?.emailAddress;
+
+      if (!userEmail) {
+        if (DEBUG_GRAPH) console.log('Outlook mailbox user email not available for SSO');
+        return false;
+      }
+
+      // If we already have an account, acquire token silently with that
+      const existing = this.msalInstance.getAllAccounts();
+      if (existing.length > 0) {
+        try {
+          await this.msalInstance.acquireTokenSilent({
+            scopes: this.config.scopes,
+            account: existing[0],
+          });
+          if (DEBUG_GRAPH) console.log('Silent token acquired using existing account');
+          return true;
+        } catch {}
+      }
+
+      // Otherwise, attempt silent token acquisition with loginHint (no popup)
+      try {
+        const result = await this.msalInstance.acquireTokenSilent({
+          scopes: this.config.scopes,
+          loginHint: userEmail,
+        } as never);
+        if (DEBUG_GRAPH) console.log('Silent token acquired via loginHint for', userEmail);
+        return !!result?.accessToken;
+      } catch (silentErr) {
+        if (DEBUG_GRAPH) console.log('Silent login with loginHint failed:', silentErr);
+        return false;
+      }
+    } catch (e) {
+      if (DEBUG_GRAPH) console.log('tryOutlookAutoSignIn encountered error:', e);
+      return false;
     }
   }
 
