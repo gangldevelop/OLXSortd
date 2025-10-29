@@ -8,7 +8,7 @@ import { ProgressBar } from './components/ProgressBar';
 import { ContactDetailsModal } from './components/ContactDetailsModal';
 import { EmailComposer } from './components/EmailComposer';
 import { LayoutShell } from './components/LayoutShell';
-import { graphService } from './services/microsoftGraphService';
+import { graphService } from './services/microsoftGraph';
 import { useContactsFilter } from './hooks/useContactsFilter';
 import { useContactAnalysis } from './hooks/useContactAnalysis';
 import type { ContactWithAnalysis } from './types/contact';

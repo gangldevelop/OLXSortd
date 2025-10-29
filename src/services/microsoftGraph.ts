@@ -1,0 +1,258 @@
+import { MsalClient, type GraphAuthConfig } from './auth/msalClient';
+import { GraphClient } from './graph/graphClient';
+import { UserService } from './graph/userService';
+import { MailService, type EmailMessage } from './graph/mailService';
+import { ContactsService } from './graph/contactsService';
+
+const DEBUG_GRAPH = import.meta.env.VITE_DEBUG_GRAPH === 'true';
+
+class MicrosoftGraphFacade {
+  private readonly msal: MsalClient;
+  private readonly graph: GraphClient;
+  private readonly users: UserService;
+  private readonly mail: MailService;
+  private readonly contacts: ContactsService;
+  private readonly lastEmailCache: Map<string, { subject: string; html: string; receivedDateTime: string; categories?: string[]; cachedAt: number }> = new Map();
+  private static readonly PREVIEW_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+  constructor() {
+    const config: GraphAuthConfig = {
+      clientId: import.meta.env.VITE_AZURE_CLIENT_ID || '',
+      authority: 'https://login.microsoftonline.com/common',
+      redirectUri: import.meta.env.VITE_AZURE_REDIRECT_URI || window.location.origin,
+      scopes: (import.meta.env.VITE_GRAPH_SCOPES || '').split(',')
+    };
+
+    this.msal = new MsalClient(config);
+    this.graph = new GraphClient(this.msal, import.meta.env.VITE_GRAPH_API_ENDPOINT);
+    this.users = new UserService(this.graph);
+    this.mail = new MailService(this.graph);
+    this.contacts = new ContactsService(this.graph);
+  }
+
+  // Auth
+  async initialize(): Promise<void> { await this.msal.initialize(); }
+  async signIn() { return this.msal.signIn(); }
+  async signOut(): Promise<void> { return this.msal.signOut(); }
+  getCurrentAccount() { return this.msal.getCurrentAccount(); }
+  async getAccessToken(): Promise<string | null> { return this.msal.getAccessToken(); }
+  async debugAuthStatus(): Promise<void> { return this.msal.debugAuthStatus(); }
+
+  // Users
+  async getCurrentUser(): Promise<{ displayName: string; mail: string; id: string }> {
+    return this.users.getCurrentUser();
+  }
+
+  // Mail
+  async sendEmail(to: string, subject: string, body: string, isHtml: boolean = true): Promise<void> {
+    return this.mail.sendEmail(to, subject, body, isHtml);
+  }
+
+  private formatEmailForDisplay(email: any): { subject: string; html: string; receivedDateTime: string, categories?: string[] } {
+    const subject = email.subject || 'No Subject';
+    const receivedDateTime = email.receivedDateTime;
+    let html = '';
+    if (email.body && email.body.content) {
+      const isHtml = (email.body.contentType || '').toLowerCase() === 'html';
+      html = isHtml ? email.body.content : email.body.content.replace(/\n/g, '<br/>');
+    } else {
+      html = `<div class="email-preview bg-blue-50 p-4 rounded-lg border border-blue-200">
+        <p class="mb-2"><strong>Subject:</strong> ${subject}</p>
+        <p class="mb-2"><strong>Date:</strong> ${new Date(receivedDateTime).toLocaleString()}</p>
+        <p class="text-sm text-gray-600 mt-3"><em>Email body content is not available.</em></p>
+      </div>`;
+    }
+    return { subject, html, receivedDateTime, categories: Array.isArray(email.categories) ? email.categories : undefined };
+  }
+
+  async getLastEmailWithContact(contactEmail: string): Promise<{ subject: string; html: string; receivedDateTime: string, categories?: string[] } | null> {
+    try {
+      const key = contactEmail.toLowerCase().trim();
+      const cached = this.lastEmailCache.get(key);
+      if (cached && Date.now() - cached.cachedAt < MicrosoftGraphFacade.PREVIEW_TTL_MS) {
+        return { subject: cached.subject, html: cached.html, receivedDateTime: cached.receivedDateTime, categories: cached.categories };
+      }
+
+      const normalizedEmail = key;
+
+      // Attempt Graph $filter
+      try {
+        const filter = `(from/emailAddress/address eq '${normalizedEmail}' or toRecipients/any(r:r/emailAddress/address eq '${normalizedEmail}'))`;
+        const filterEndpoint = `/me/messages?$top=1&$orderby=receivedDateTime desc&$filter=${encodeURIComponent(filter)}&$select=id,subject,receivedDateTime,from,toRecipients,categories`;
+        const filtered = await this.graph.request<{ value?: any[] }>(filterEndpoint, 'GET', undefined, { 'ConsistencyLevel': 'eventual' });
+        const hit = (filtered.value || [])[0];
+        if (hit) {
+          const body = await this.mail.getMessageBodyQuick(hit.id);
+          const chosen = { ...hit, ...body };
+          const preview = this.formatEmailForDisplay(chosen);
+          this.lastEmailCache.set(key, { ...preview, cachedAt: Date.now() });
+          return preview;
+        }
+      } catch {}
+
+      // Attempt Graph $search
+      try {
+        const searchQuery = `"${normalizedEmail}"`;
+        const searchEndpoint = `/me/messages?$search=${encodeURIComponent(searchQuery)}&$top=5&$select=id,subject,receivedDateTime,from,toRecipients,categories,bodyPreview`;
+        const searchResp = await this.graph.request<{ value?: any[] }>(searchEndpoint, 'GET', undefined, { 'ConsistencyLevel': 'eventual' });
+        const hits = (searchResp.value || []).sort((a, b) => new Date(b.receivedDateTime).getTime() - new Date(a.receivedDateTime).getTime());
+        const direct = hits.find(m => {
+          const fromEmail = m.from?.emailAddress?.address?.toLowerCase() || '';
+          const toEmails = (m.toRecipients || []).map((r: any) => r.emailAddress?.address?.toLowerCase() || '');
+          return fromEmail === normalizedEmail || toEmails.includes(normalizedEmail);
+        }) || hits[0];
+        if (direct) {
+          const body = await this.mail.getMessageBodyQuick(direct.id);
+          const chosen = { ...direct, ...body };
+          const preview = this.formatEmailForDisplay(chosen);
+          this.lastEmailCache.set(key, { ...preview, cachedAt: Date.now() });
+          return preview;
+        }
+      } catch {}
+
+      // Fallback: recent emails and client-side filter
+      const inbox = await this.mail.getEmailMessages('inbox', 100);
+      const sent = await this.mail.getEmailMessages('sentitems', 100);
+      let relevant: EmailMessage[] = [...inbox, ...sent].filter(email => {
+        const fromEmail = email.from?.emailAddress?.address?.toLowerCase() || '';
+        const toEmails = (email.toRecipients || []).map(r => r.emailAddress?.address?.toLowerCase() || '');
+        return fromEmail === normalizedEmail || toEmails.includes(normalizedEmail);
+      });
+      if (relevant.length > 0) {
+        relevant.sort((a, b) => new Date(b.receivedDateTime).getTime() - new Date(a.receivedDateTime).getTime());
+        let chosen: any = relevant[0];
+        const full = await this.mail.getMessageBodyQuick(chosen.id);
+        if (full) chosen = { ...chosen, ...full };
+        const preview = this.formatEmailForDisplay(chosen);
+        this.lastEmailCache.set(key, { ...preview, cachedAt: Date.now() });
+        return preview;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Failed to get last email for contact:', error);
+      return null;
+    }
+  }
+
+  private extractThreadId(subject: string): string {
+    const baseSubject = subject.replace(/^(re:|fwd?:|fw:)\s*/i, '').trim().toLowerCase();
+    return baseSubject.replace(/[^a-z0-9]/g, '').substring(0, 20) || 'thread-' + Math.random().toString(36).substr(2, 9);
+  }
+
+  async getEmailInteractionsForAnalysis(limit: number = 200): Promise<Array<{
+    id: string;
+    contactId: string;
+    subject: string;
+    date: Date;
+    direction: 'sent' | 'received';
+    isRead: boolean;
+    isReplied: boolean;
+    threadId?: string;
+  }>> {
+    const currentUser = await this.getCurrentUser();
+    const userEmail = currentUser.mail;
+    const sentEmails = await this.mail.getEmailMessages('sentitems', Math.min(limit, 1000));
+    const receivedEmails = await this.mail.getEmailMessages('inbox', Math.min(limit, 1000));
+
+    const interactions: Array<{
+      id: string; contactId: string; subject: string; date: Date; direction: 'sent' | 'received'; isRead: boolean; isReplied: boolean; threadId?: string;
+    }> = [];
+
+    sentEmails.forEach(email => {
+      email.toRecipients.forEach(recipient => {
+        if (recipient.emailAddress.address !== userEmail) {
+          interactions.push({
+            id: email.id,
+            contactId: recipient.emailAddress.address,
+            subject: email.subject || 'No Subject',
+            date: new Date(email.sentDateTime || email.receivedDateTime),
+            direction: 'sent',
+            isRead: true,
+            isReplied: false,
+            threadId: this.extractThreadId(email.subject || '')
+          });
+        }
+      });
+    });
+
+    receivedEmails.forEach(email => {
+      const senderEmail = email.from.emailAddress.address;
+      if (senderEmail !== userEmail) {
+        interactions.push({
+          id: email.id,
+          contactId: senderEmail,
+          subject: email.subject || 'No Subject',
+          date: new Date(email.receivedDateTime),
+          direction: 'received',
+          isRead: email.isRead,
+          isReplied: false,
+          threadId: this.extractThreadId(email.subject || '')
+        });
+      }
+    });
+
+    if (DEBUG_GRAPH) console.log(`Found ${interactions.length} email interactions for analysis`);
+    return interactions;
+  }
+
+  async getContactsForAnalysis(options: { maxEmails?: number; useAllEmails?: boolean; quickMode?: boolean } = {}): Promise<Array<{ id: string; name: string; email: string }>> {
+    const currentUser = await this.getCurrentUser();
+    const userEmail = currentUser.mail;
+    const { maxEmails = 10000, useAllEmails = false, quickMode = false } = options;
+
+    // Outlook contacts
+    const outlookRaw = await this.contacts.getContacts();
+    const outlookContacts = outlookRaw.map(c => ({ id: c.id, name: c.displayName || 'Unknown', email: c.emailAddresses[0]?.address || '' }))
+      .filter(c => c.email && c.email !== userEmail);
+
+    let sentEmails: EmailMessage[] = [];
+    let receivedEmails: EmailMessage[] = [];
+    if (useAllEmails) {
+      // Fallback to a broader sample if all-emails not practical; keep behavior sane
+      sentEmails = await this.mail.getEmailMessages('sentitems', 1000);
+      receivedEmails = await this.mail.getEmailMessages('inbox', 1000);
+    } else if (quickMode) {
+      sentEmails = await this.mail.getEmailMessages('sentitems', 1000);
+      receivedEmails = await this.mail.getEmailMessages('inbox', 1000);
+    } else {
+      sentEmails = await this.contacts.getEmailMessagesFromPeriods('sentitems', [0, 30, 90, 180, 365]);
+      receivedEmails = await this.contacts.getEmailMessagesFromPeriods('inbox', [0, 30, 90, 180, 365]);
+    }
+
+    const emailContacts = new Map<string, { id: string; name: string; email: string }>();
+    sentEmails.forEach(email => {
+      email.toRecipients.forEach(recipient => {
+        if (recipient.emailAddress.address !== userEmail) {
+          emailContacts.set(recipient.emailAddress.address, {
+            id: recipient.emailAddress.address,
+            name: recipient.emailAddress.name || recipient.emailAddress.address.split('@')[0],
+            email: recipient.emailAddress.address,
+          });
+        }
+      });
+    });
+
+    receivedEmails.forEach(email => {
+      const sender = email.from.emailAddress.address;
+      if (sender !== userEmail) {
+        emailContacts.set(sender, {
+          id: sender,
+          name: email.from.emailAddress.name || sender.split('@')[0],
+          email: sender,
+        });
+      }
+    });
+
+    const all: Array<{ id: string; name: string; email: string }> = [...outlookContacts];
+    emailContacts.forEach(contact => {
+      if (!all.find(c => c.email === contact.email)) all.push(contact);
+    });
+    if (DEBUG_GRAPH) console.log(`Found ${outlookContacts.length} Outlook contacts and ${emailContacts.size} email contacts (${all.length} total)`);
+    return all.slice(0, maxEmails); // safety cap
+  }
+}
+
+export const graphService = new MicrosoftGraphFacade();
+
+

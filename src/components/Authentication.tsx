@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { graphService } from '../services/microsoftGraphService';
+import { graphService } from '../services/microsoftGraph';
 
 interface AuthenticationProps {
   onAuthenticated: (user: { displayName: string; mail: string; id: string }) => void;
@@ -34,19 +34,6 @@ export function Authentication({ onAuthenticated }: AuthenticationProps) {
         } catch (error) {
           console.log('User session expired, need to sign in again:', error);
         }
-      } else {
-        // If running inside Outlook, try silent SSO using mailbox user
-        try {
-          const didSso = await graphService.tryOutlookAutoSignIn();
-          if (didSso) {
-            const token = await graphService.getAccessToken();
-            if (token) {
-              const user = await graphService.getCurrentUser();
-              onAuthenticated(user);
-              return;
-            }
-          }
-        } catch {}
       }
     } catch (error) {
       console.error('Failed to initialize authentication:', error);

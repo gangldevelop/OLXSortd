@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { BatchedContactAnalysis } from '../services/batchedContactAnalysis';
-import { graphService } from '../services/microsoftGraphService';
+import { graphService } from '../services/microsoftGraph';
 import type { ContactWithAnalysis } from '../types/contact';
 import type { ProgressUpdate } from '../services/progressTracker';
 
