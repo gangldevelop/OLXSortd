@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { graphService } from '../services/microsoftGraphService';
+import { graphService } from '../services/microsoftGraph';
 
 interface AuthenticationProps {
   onAuthenticated: (user: { displayName: string; mail: string; id: string }) => void;

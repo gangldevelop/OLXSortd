@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { EmailTemplateSelector } from './EmailTemplateSelector';
 import { EmailEditor } from './EmailEditor';
-import { graphService } from '../services/microsoftGraphService';
+import { graphService } from '../services/microsoftGraph';
 import type { ContactWithAnalysis } from '../types/contact';
 import type { EmailTemplate } from '../types/email';
 

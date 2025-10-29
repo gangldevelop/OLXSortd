@@ -46,8 +46,8 @@ export function AnalysisSummary({
   }, [contactsNeedingAttention]);
 
   return (
-    <div className="space-y-3">
-      <div className="bg-white rounded border p-2">
+    <div className="space-y-2">
+      <div className="bg-white rounded border p-1.5">
         <h3 className="text-xs font-semibold text-gray-700 mb-2">Contact Categories</h3>
         <div className="flex flex-wrap gap-1">
           <button
@@ -96,10 +96,10 @@ export function AnalysisSummary({
       </div>
 
       {contactsNeedingAttention.length > 0 && (
-        <div className="bg-white rounded border p-3">
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">Needs Attention ({needsAttentionContacts.length})</h3>
+        <div className="bg-white rounded border p-2">
+          <h3 className="text-sm font-semibold text-gray-900 mb-2">Needs Attention ({needsAttentionContacts.length})</h3>
 
-          <div className="mb-3">
+          <div className="mb-2">
             <ContactSearch
               contacts={contactsNeedingAttention}
               onFilteredContacts={setNeedsAttentionContacts}
@@ -108,7 +108,7 @@ export function AnalysisSummary({
             />
           </div>
 
-          <div className="max-h-48 overflow-y-auto space-y-2">
+          <div className="max-h-48 overflow-y-auto space-y-1.5">
             {needsAttentionContacts.map((contact) => {
               const getCategoryColor = getCategoryColorClasses;
 
@@ -119,7 +119,7 @@ export function AnalysisSummary({
               return (
                 <div
                   key={contact.id}
-                  className="flex items-start justify-between p-2 bg-gray-50 rounded hover:bg-gray-100 transition-colors cursor-pointer"
+                  className="flex items-start justify-between p-1.5 bg-gray-50 rounded hover:bg-gray-100 transition-colors cursor-pointer"
                   onClick={() => onShowContactDetails(contact)}
                 >
                   <div className="flex-1 min-w-0">
