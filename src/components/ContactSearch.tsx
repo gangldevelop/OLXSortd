@@ -74,6 +74,7 @@ export function ContactSearch({
           case 'recent': return daysSince <= 7;
           case 'month': return daysSince <= 30;
           case 'old': return daysSince > 30;
+          case 'year': return daysSince > 365;
           default: return true;
         }
       });
@@ -212,7 +213,8 @@ export function ContactSearch({
           <option value="recent">Last 7 days</option>
           <option value="month">Last 30 days</option>
           <option value="old">Older than 30 days</option>
-          <option value="never">Never contacted</option>
+          <option value="year">Over 1 year</option>
+          <option value="never">Never</option>
         </select>
 
         <select

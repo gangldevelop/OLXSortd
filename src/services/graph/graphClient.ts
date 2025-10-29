@@ -20,7 +20,7 @@ export class GraphClient {
     const token = await this.msal.getAccessToken();
     if (!token) throw new Error('No access token available');
 
-    const url = `${this.baseUrl}${endpoint}`;
+    const url = endpoint.startsWith('http') ? endpoint : `${this.baseUrl}${endpoint}`;
     const headers = {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',

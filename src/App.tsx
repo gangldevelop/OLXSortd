@@ -60,7 +60,6 @@ function App() {
     // Ensure MSAL is initialized after authentication
     try {
       await graphService.initialize();
-      console.log('MSAL initialized successfully in App component');
     } catch (error) {
       console.error('Failed to initialize MSAL in App component:', error);
     }
