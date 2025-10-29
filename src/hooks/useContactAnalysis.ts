@@ -89,20 +89,19 @@ export function useContactAnalysis(onContactsAnalyzed: (contacts: ContactWithAna
 
       await new Promise((resolve) => setTimeout(resolve, 500));
 
-      // Background prefetch: warm last-email previews for top contacts to speed first open
+      // Optional background prefetch (disabled by default to reduce 429s)
       try {
-        const topForPreview = analyzedContacts.slice(0, 20);
-        // Light concurrency to avoid throttling
-        const concurrency = 2;
-        for (let i = 0; i < topForPreview.length; i += concurrency) {
-          const chunk = topForPreview.slice(i, i + concurrency);
-          // Fire and forget
-          void Promise.all(
-            chunk.map((c) => graphService.getLastEmailWithContact(c.email).catch(() => null))
-          );
-          // small gap to be gentle on Graph
-          // eslint-disable-next-line no-await-in-loop
-          await new Promise((r) => setTimeout(r, 100));
+        if (import.meta.env.VITE_PREFETCH_LAST_EMAIL === 'true') {
+          const topForPreview = analyzedContacts.slice(0, 10);
+          const concurrency = 1;
+          for (let i = 0; i < topForPreview.length; i += concurrency) {
+            const chunk = topForPreview.slice(i, i + concurrency);
+            void Promise.all(
+              chunk.map((c) => graphService.getLastEmailWithContact(c.email).catch(() => null))
+            );
+            // eslint-disable-next-line no-await-in-loop
+            await new Promise((r) => setTimeout(r, 300));
+          }
         }
       } catch {}
     } catch (error) {

@@ -38,7 +38,7 @@ export function useContactsFilter(allContacts: ContactWithAnalysis[]) {
   }, [allContacts, selectedCategory]);
 
   const visibleContacts = useMemo(() => {
-    return baseContacts.filter((c) => !isEmailSnoozed(c.email));
+    return baseContacts.filter((c) => !isEmailSnoozed(c.email) && !(c.tags || []).includes('crossware'));
   }, [baseContacts, snoozedUntilByEmail]);
 
   useEffect(() => {

@@ -4,6 +4,7 @@ import type {
   ContactAnalysisConfig 
 } from '../types/contact';
 import { ContactAnalyzer } from './contactAnalyzer';
+import { isCrosswareEmail, isResellerEmail } from '../utils/segmentation';
 
 /**
  * Service for managing contact analysis operations
@@ -69,7 +70,7 @@ export class ContactAnalysisService {
         responseRate: analysis.metrics.responseRate,
         isActive: analysis.category === 'frequent',
         lastEmailSubject,
-        tags: this.generateTags(analysis)
+        tags: this.generateTags(contact.email, analysis)
       };
 
       this.analysisCache.set(contact.id, contactWithAnalysis);
@@ -120,7 +121,7 @@ export class ContactAnalysisService {
         responseRate: analysis.metrics.responseRate,
         isActive: analysis.category === 'frequent',
         lastEmailSubject,
-        tags: this.generateTags(analysis)
+        tags: this.generateTags(contact.email, analysis)
       };
 
       this.analysisCache.set(contact.id, contactWithAnalysis);
@@ -204,7 +205,7 @@ export class ContactAnalysisService {
   /**
    * Generates tags based on analysis
    */
-  private generateTags(analysis: { metrics: { responseRate: number; daysSinceLastContact: number; totalEmails: number }; category: string }): string[] {
+  private generateTags(email: string, analysis: { metrics: { responseRate: number; daysSinceLastContact: number; totalEmails: number }; category: string }): string[] {
     const tags: string[] = [];
 
     if (analysis.metrics.responseRate > 0.8) {
@@ -221,6 +222,14 @@ export class ContactAnalysisService {
     
     if (analysis.category === 'inactive' && analysis.metrics.totalEmails > 5) {
       tags.push('reconnect-opportunity');
+    }
+
+    // Add segmentation tags
+    if (isCrosswareEmail(email)) {
+      tags.push('crossware');
+    }
+    if (isResellerEmail(email)) {
+      tags.push('reseller');
     }
 
     return tags;

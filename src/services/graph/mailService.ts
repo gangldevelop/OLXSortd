@@ -19,8 +19,9 @@ export class MailService {
   }
 
   async getEmailMessages(folder: 'inbox' | 'sentitems' = 'inbox', limit: number = 50): Promise<EmailMessage[]> {
+    const orderBy = folder === 'sentitems' ? 'sentDateTime' : 'receivedDateTime';
     const resp = await this.graph.request<{ value: EmailMessage[] }>(
-      `/me/mailFolders/${folder}/messages?$top=${limit}&$orderby=receivedDateTime desc&$select=id,subject,receivedDateTime,from,toRecipients,isRead`
+      `/me/mailFolders/${folder}/messages?$top=${limit}&$orderby=${orderBy} desc&$select=id,subject,receivedDateTime,sentDateTime,from,toRecipients,isRead`
     );
     return resp.value;
   }
