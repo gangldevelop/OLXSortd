@@ -68,7 +68,7 @@ export class ContactAnalysisService {
         lastContactDate,
         emailCount: contactInteractions.length,
         responseRate: analysis.metrics.responseRate,
-        isActive: analysis.category === 'frequent',
+        isActive: analysis.category === 'active',
         lastEmailSubject,
         tags: this.generateTags(contact.email, analysis)
       };
@@ -119,7 +119,7 @@ export class ContactAnalysisService {
         lastContactDate,
         emailCount: contactInteractions.length,
         responseRate: analysis.metrics.responseRate,
-        isActive: analysis.category === 'frequent',
+        isActive: analysis.category === 'active',
         lastEmailSubject,
         tags: this.generateTags(contact.email, analysis)
       };
@@ -136,10 +136,9 @@ export class ContactAnalysisService {
   public getAnalysisSummary(contacts: ContactWithAnalysis[]) {
     const summary = {
       total: contacts.length,
-      frequent: contacts.filter(c => c.category === 'frequent').length,
-      inactive: contacts.filter(c => c.category === 'inactive').length,
-      cold: contacts.filter(c => c.category === 'cold').length,
-      warm: contacts.filter(c => c.category === 'warm').length,
+      active: contacts.filter(c => c.category === 'active').length,
+      engaged: contacts.filter(c => c.category === 'engaged').length,
+      dormant: contacts.filter(c => c.category === 'dormant').length,
       averageResponseRate: 0,
       averageConfidenceScore: 0
     };
@@ -162,13 +161,8 @@ export class ContactAnalysisService {
    */
   public getContactsNeedingAttention(contacts: ContactWithAnalysis[]): ContactWithAnalysis[] {
     return contacts.filter(contact => {
-      // Inactive contacts that were previously responsive
-      if (contact.category === 'inactive' && contact.responseRate > 0.5) {
-        return true;
-      }
-
-      // Cold contacts with some previous interaction
-      if (contact.category === 'cold' && contact.emailCount > 0) {
+      // Dormant contacts with some previous interaction or promising response rate
+      if (contact.category === 'dormant' && (contact.emailCount > 0 || contact.responseRate > 0.3)) {
         return true;
       }
 

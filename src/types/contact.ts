@@ -1,4 +1,4 @@
-export type ContactCategory = 'frequent' | 'inactive' | 'cold' | 'warm' | 'hot';
+export type ContactCategory = 'active' | 'engaged' | 'dormant';
 
 export interface EmailInteraction {
   id: string;
