@@ -175,10 +175,10 @@ export class BatchedContactAnalysis {
       
       // Sort contacts by category and response rate for better UX
       analyzedContacts.sort((a, b) => {
-        // Priority order: hot > frequent > warm > inactive > cold
-        const categoryOrder = { hot: 0, frequent: 1, warm: 2, inactive: 3, cold: 4 };
-        const aOrder = categoryOrder[a.category] ?? 5;
-        const bOrder = categoryOrder[b.category] ?? 5;
+        // Priority order: active (Recent) > engaged (In Touch) > dormant (Inactive)
+        const categoryOrder: Record<string, number> = { active: 0, engaged: 1, dormant: 2 };
+        const aOrder = categoryOrder[a.category] ?? 99;
+        const bOrder = categoryOrder[b.category] ?? 99;
         
         if (aOrder !== bOrder) return aOrder - bOrder;
         

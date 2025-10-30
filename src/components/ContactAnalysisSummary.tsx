@@ -8,22 +8,19 @@ interface ContactAnalysisSummaryProps {
 export function ContactAnalysisSummary({ contacts, onContactSelect }: ContactAnalysisSummaryProps) {
   const summary = {
     total: contacts.length,
-    frequent: contacts.filter(c => c.category === 'frequent').length,
-    inactive: contacts.filter(c => c.category === 'inactive').length,
-    cold: contacts.filter(c => c.category === 'cold').length,
-    warm: contacts.filter(c => c.category === 'warm').length,
+    active: contacts.filter(c => c.category === 'active').length,
+    engaged: contacts.filter(c => c.category === 'engaged').length,
+    dormant: contacts.filter(c => c.category === 'dormant').length,
   };
 
   const getCategoryColor = (category: string) => {
     switch (category) {
-      case 'frequent':
+      case 'active': // Recent
         return 'bg-green-100 text-green-800 border-green-200';
-      case 'inactive':
+      case 'engaged': // In Touch
+        return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'dormant': // Inactive
         return 'bg-orange-100 text-orange-800 border-orange-200';
-      case 'cold':
-        return 'bg-gray-100 text-gray-800 border-gray-200';
-      case 'warm':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       default:
         return 'bg-gray-100 text-gray-800 border-gray-200';
     }
@@ -31,22 +28,19 @@ export function ContactAnalysisSummary({ contacts, onContactSelect }: ContactAna
 
   const getCategoryIcon = (category: string) => {
     switch (category) {
-      case 'frequent':
+      case 'active':
         return '🔥';
-      case 'inactive':
+      case 'engaged':
+        return '🤝';
+      case 'dormant':
         return '⏰';
-      case 'cold':
-        return '❄️';
-      case 'warm':
-        return '🌡️';
       default:
         return '❓';
     }
   };
 
   const contactsNeedingAttention = contacts.filter(contact => 
-    contact.category === 'inactive' || 
-    (contact.category === 'cold' && contact.emailCount > 0)
+    contact.category === 'dormant'
   );
 
   return (
@@ -61,20 +55,16 @@ export function ContactAnalysisSummary({ contacts, onContactSelect }: ContactAna
             <div className="text-sm text-gray-600">Total</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-green-600">{summary.frequent}</div>
-            <div className="text-sm text-gray-600">Frequent</div>
+            <div className="text-2xl font-bold text-green-600">{summary.active}</div>
+            <div className="text-sm text-gray-600">Recent</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-orange-600">{summary.inactive}</div>
+            <div className="text-2xl font-bold text-blue-600">{summary.engaged}</div>
+            <div className="text-sm text-gray-600">In Touch</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-orange-600">{summary.dormant}</div>
             <div className="text-sm text-gray-600">Inactive</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-gray-600">{summary.cold}</div>
-            <div className="text-sm text-gray-600">Cold</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-yellow-600">{summary.warm}</div>
-            <div className="text-sm text-gray-600">Warm</div>
           </div>
         </div>
       </div>
@@ -135,37 +125,37 @@ export function ContactAnalysisSummary({ contacts, onContactSelect }: ContactAna
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Key Insights</h3>
         
         <div className="space-y-3">
-          {summary.frequent > 0 && (
+          {summary.active > 0 && (
             <div className="flex items-start gap-3 p-3 bg-green-50 rounded-lg">
               <span className="text-green-600 text-lg">🔥</span>
               <div>
-                <p className="font-medium text-green-900">Active Relationships</p>
+                <p className="font-medium text-green-900">Recent Relationships</p>
                 <p className="text-sm text-green-700">
-                  {summary.frequent} contacts are actively engaged. Keep nurturing these relationships.
+                  {summary.active} contacts had recent interactions. Keep nurturing these relationships.
                 </p>
               </div>
             </div>
           )}
           
-          {summary.inactive > 0 && (
+          {summary.engaged > 0 && (
+            <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg">
+              <span className="text-blue-600 text-lg">🤝</span>
+              <div>
+                <p className="font-medium text-blue-900">In Touch</p>
+                <p className="text-sm text-blue-700">
+                  {summary.engaged} contacts are in active conversation. Maintain momentum.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {summary.dormant > 0 && (
             <div className="flex items-start gap-3 p-3 bg-orange-50 rounded-lg">
               <span className="text-orange-600 text-lg">⏰</span>
               <div>
                 <p className="font-medium text-orange-900">Reconnect Opportunities</p>
                 <p className="text-sm text-orange-700">
-                  {summary.inactive} contacts have gone quiet. Consider reaching out to rekindle these relationships.
-                </p>
-              </div>
-            </div>
-          )}
-          
-          {summary.cold > 0 && (
-            <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
-              <span className="text-gray-600 text-lg">❄️</span>
-              <div>
-                <p className="font-medium text-gray-900">Cold Outreach Potential</p>
-                <p className="text-sm text-gray-700">
-                  {summary.cold} contacts have minimal interaction. Perfect for cold outreach campaigns.
+                  {summary.dormant} contacts have gone quiet. Consider reaching out to rekindle these relationships.
                 </p>
               </div>
             </div>
