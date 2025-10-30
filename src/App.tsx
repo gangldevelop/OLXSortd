@@ -11,7 +11,8 @@ import { LayoutShell } from './components/LayoutShell';
 import { graphService } from './services/microsoftGraph';
 import { useContactsFilter } from './hooks/useContactsFilter';
 import { useContactAnalysis } from './hooks/useContactAnalysis';
-import type { ContactWithAnalysis } from './types/contact';
+import type { ContactWithAnalysis, ContactCategory } from './types/contact';
+import { getCategoryLabel } from './utils/contactCategory';
 // email templates handled inside EmailComposer
 // progress handled by useContactAnalysis
 
@@ -60,7 +61,6 @@ function App() {
     // Ensure MSAL is initialized after authentication
     try {
       await graphService.initialize();
-      console.log('MSAL initialized successfully in App component');
     } catch (error) {
       console.error('Failed to initialize MSAL in App component:', error);
     }
@@ -172,7 +172,7 @@ function App() {
               <div className="bg-blue-50 border border-blue-200 rounded p-1.5">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-blue-800">
-                    Showing {selectedCategory} contacts ({filteredContacts.length} of {baseContacts.length})
+                    Showing {getCategoryLabel(selectedCategory as ContactCategory)} contacts ({filteredContacts.length} of {baseContacts.length})
                   </span>
                   <button 
                     onClick={() => handleCategoryClick(null)}
@@ -188,7 +188,7 @@ function App() {
             <div className="flex-1 min-h-0">
               <div className="bg-white rounded border p-2">
                 <h3 className="text-sm font-semibold text-gray-900 mb-3">
-                  {selectedCategory ? `${selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)} Contacts` : 'All Contacts'} ({filteredContacts.length})
+                  {selectedCategory ? `${getCategoryLabel(selectedCategory as ContactCategory)} Contacts` : 'All Contacts'} ({filteredContacts.length})
                 </h3>
                 
                 {/* Search and Filter Controls */}
@@ -196,7 +196,7 @@ function App() {
                   <ContactSearch 
                     contacts={visibleContacts}
                     onFilteredContacts={setFilteredContacts}
-                    placeholder={`Search ${selectedCategory || 'all'} contacts...`}
+                    placeholder={`Search ${selectedCategory ? getCategoryLabel(selectedCategory as ContactCategory) : 'all'} contacts...`}
                     showAdvancedFilters={true}
                   />
                 </div>

@@ -1,4 +1,5 @@
 import type { ContactWithAnalysis } from '../types/contact';
+import { getCategoryTooltip, getCategoryLabel } from '../utils/contactCategory';
 
 interface ContactListProps {
   contacts: ContactWithAnalysis[];
@@ -11,15 +12,11 @@ export function ContactList({ contacts, onDraftEmail, onViewEmail, onSnooze }: C
 
   const getCategoryColor = (category: ContactWithAnalysis['category']) => {
     switch (category) {
-      case 'frequent':
+      case 'active':
         return 'bg-green-100 text-green-800';
-      case 'inactive':
-        return 'bg-orange-100 text-orange-800';
-      case 'warm':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'hot':
-        return 'bg-red-100 text-red-800';
-      case 'cold':
+      case 'engaged':
+        return 'bg-blue-100 text-blue-800';
+      case 'dormant':
         return 'bg-gray-100 text-gray-800';
       default:
         return 'bg-gray-100 text-gray-800';
@@ -41,8 +38,8 @@ export function ContactList({ contacts, onDraftEmail, onViewEmail, onSnooze }: C
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <h4 className="font-medium text-gray-900 text-sm truncate">{contact.name}</h4>
-                    <span className={`px-1.5 py-0.5 text-xs font-medium rounded ${getCategoryColor(contact.category)}`}>
-                      {contact.category}
+                    <span title={getCategoryTooltip(contact.category)} className={`px-1.5 py-0.5 text-xs font-medium rounded ${getCategoryColor(contact.category)}`}>
+                      {getCategoryLabel(contact.category)}
                     </span>
                   </div>
                   <p className="text-xs text-gray-500 truncate mb-1">{contact.email}</p>

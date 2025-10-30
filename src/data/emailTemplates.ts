@@ -1,4 +1,5 @@
 import type { EmailTemplate } from '../types/email';
+import type { ContactCategory } from '../types/contact';
 
 export const emailTemplates: EmailTemplate[] = [
   {
@@ -15,7 +16,7 @@ Looking forward to hearing from you.
 
 Best,
 {{senderName}}`,
-    category: 'frequent',
+    category: 'active',
     variables: ['name', 'senderName']
   },
   {
@@ -32,7 +33,7 @@ Would you be interested in a brief call to reconnect?
 
 Best regards,
 {{senderName}}`,
-    category: 'inactive',
+    category: 'dormant',
     variables: ['name', 'company', 'senderName']
   },
   {
@@ -49,7 +50,7 @@ Would you be available for a quick call this week to discuss next steps?
 
 Best regards,
 {{senderName}}`,
-    category: 'warm',
+    category: 'engaged',
     variables: ['name', 'topic', 'senderName']
   },
   {
@@ -66,7 +67,7 @@ Would you be interested in a brief call to discuss this opportunity?
 
 Best regards,
 {{senderName}}`,
-    category: 'hot',
+    category: 'engaged',
     variables: ['name', 'company', 'industry', 'senderName']
   },
   {
@@ -83,12 +84,12 @@ Do you have a few minutes for a brief conversation this week?
 
 Best regards,
 {{senderName}}`,
-    category: 'cold',
+    category: 'dormant',
     variables: ['name', 'company', 'industry', 'senderName']
   }
 ];
 
-export function getTemplateByCategory(category: 'frequent' | 'inactive' | 'cold'): EmailTemplate | undefined {
+export function getTemplateByCategory(category: ContactCategory): EmailTemplate | undefined {
   return emailTemplates.find(template => template.category === category);
 }
 

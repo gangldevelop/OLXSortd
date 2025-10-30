@@ -134,48 +134,26 @@ export class ContactAnalyzer {
    * Determines contact category based on metrics and interactions
    */
   private determineCategory(metrics: ReturnType<ContactAnalyzer['calculateMetrics']>): ContactCategory {
-    // Frequent: Active recent communication
+    // ACTIVE: recent or frequent touch and some responsiveness
     if (
-      metrics.emailsLast30Days >= this.config.frequent.minEmailsLast30Days &&
-      metrics.daysSinceLastContact <= this.config.frequent.maxDaysSinceLastContact &&
-      metrics.responseRate >= this.config.frequent.minResponseRate
+      metrics.daysSinceLastContact <= 30 ||
+      metrics.emailsLast30Days >= 2 ||
+      (metrics.emailsLast90Days >= 5 && metrics.responseRate >= 0.2)
     ) {
-      return 'frequent';
+      return 'active';
     }
 
-    // Inactive: Previously active but communication dropped off
+    // ENGAGED: good history and reasonable responsiveness in last ~4 months
     if (
-      metrics.daysSinceLastContact >= this.config.inactive.minDaysSinceLastContact &&
-      metrics.daysSinceLastContact <= this.config.inactive.maxDaysSinceLastContact &&
-      metrics.totalEmails >= this.config.inactive.minPreviousEmails
+      metrics.totalEmails >= 3 &&
+      metrics.responseRate >= 0.3 &&
+      metrics.daysSinceLastContact <= 120
     ) {
-      return 'inactive';
+      return 'engaged';
     }
 
-    // Warm: Some communication but not meeting frequent criteria
-    if (metrics.totalEmails > 2 && metrics.responseRate > 0.3) {
-      return 'warm';
-    }
-
-    // Cold: Minimal or no communication
-    if (
-      metrics.totalEmails <= this.config.cold.maxEmailsTotal &&
-      metrics.daysSinceLastContact >= this.config.cold.maxDaysSinceLastContact
-    ) {
-      return 'cold';
-    }
-
-    // Hot: High engagement but not recent enough for frequent
-    if (metrics.totalEmails > 5 && metrics.responseRate > 0.7 && metrics.daysSinceLastContact <= 30) {
-      return 'hot';
-    }
-
-    // Default based on email count and response rate
-    if (metrics.totalEmails > 2) {
-      return 'warm';
-    }
-    
-    return 'cold';
+    // DORMANT: everyone else (long time since last touch or very sparse history)
+    return 'dormant';
   }
 
   /**
@@ -197,14 +175,15 @@ export class ContactAnalyzer {
     if (metrics.responseRate > 0.5) score += 10;
 
     // Category-specific adjustments
+    // Category weights adjusted for simplified model
     switch (category) {
-      case 'frequent':
+      case 'active':
         score += 10;
         break;
-      case 'inactive':
+      case 'engaged':
         score += 5;
         break;
-      case 'cold':
+      case 'dormant':
         score -= 10;
         break;
     }
@@ -218,7 +197,7 @@ export class ContactAnalyzer {
   private generateInsights(metrics: ReturnType<ContactAnalyzer['calculateMetrics']>, category: ContactCategory): string[] {
     const insights: string[] = [];
 
-    if (category === 'frequent') {
+    if (category === 'active') {
       insights.push(`Active communication with ${metrics.totalEmails} emails`);
       if (metrics.daysSinceLastContact < 3) {
         insights.push('Very recent contact - relationship is active');
@@ -226,13 +205,13 @@ export class ContactAnalyzer {
       if (metrics.responseRate > 0.8) {
         insights.push('Excellent response rate - highly engaged contact');
       }
-    } else if (category === 'inactive') {
-      insights.push(`Previously active but no contact for ${metrics.daysSinceLastContact} days`);
-      insights.push(`Had ${metrics.totalEmails} emails - relationship worth rekindling`);
+    } else if (category === 'engaged') {
+      insights.push('Good relationship - not very recent but responsive');
+      insights.push(`Last contact ${metrics.daysSinceLastContact} days ago`);
       if (metrics.responseRate > 0.5) {
         insights.push('Good historical response rate - likely to re-engage');
       }
-    } else if (category === 'cold') {
+    } else if (category === 'dormant') {
       insights.push('Limited communication history');
       if (metrics.totalEmails === 0) {
         insights.push('Never contacted - perfect for cold outreach');

@@ -5,6 +5,9 @@ import { MailService, type EmailMessage } from './graph/mailService';
 import { ContactsService } from './graph/contactsService';
 
 const DEBUG_GRAPH = import.meta.env.VITE_DEBUG_GRAPH === 'true';
+const HISTORY_DAYS = Number(import.meta.env.VITE_HISTORY_DAYS ?? 730); // default 2 years
+const GRAPH_PAGE_SIZE = Number(import.meta.env.VITE_GRAPH_PAGE_SIZE ?? 100);
+const GRAPH_MAX_PAGES = Number(import.meta.env.VITE_GRAPH_MAX_PAGES ?? 40);
 
 class MicrosoftGraphFacade {
   private readonly msal: MsalClient;
@@ -75,25 +78,10 @@ class MicrosoftGraphFacade {
 
       const normalizedEmail = key;
 
-      // Attempt Graph $filter
-      try {
-        const filter = `(from/emailAddress/address eq '${normalizedEmail}' or toRecipients/any(r:r/emailAddress/address eq '${normalizedEmail}'))`;
-        const filterEndpoint = `/me/messages?$top=1&$orderby=receivedDateTime desc&$filter=${encodeURIComponent(filter)}&$select=id,subject,receivedDateTime,from,toRecipients,categories`;
-        const filtered = await this.graph.request<{ value?: any[] }>(filterEndpoint, 'GET', undefined, { 'ConsistencyLevel': 'eventual' });
-        const hit = (filtered.value || [])[0];
-        if (hit) {
-          const body = await this.mail.getMessageBodyQuick(hit.id);
-          const chosen = { ...hit, ...body };
-          const preview = this.formatEmailForDisplay(chosen);
-          this.lastEmailCache.set(key, { ...preview, cachedAt: Date.now() });
-          return preview;
-        }
-      } catch {}
-
-      // Attempt Graph $search
+      // Prefer Graph $search first to avoid brittle $filter on nested properties
       try {
         const searchQuery = `"${normalizedEmail}"`;
-        const searchEndpoint = `/me/messages?$search=${encodeURIComponent(searchQuery)}&$top=5&$select=id,subject,receivedDateTime,from,toRecipients,categories,bodyPreview`;
+        const searchEndpoint = `/me/messages?$search=${encodeURIComponent(searchQuery)}&$top=3&$select=id,subject,receivedDateTime,from,toRecipients,categories,bodyPreview`;
         const searchResp = await this.graph.request<{ value?: any[] }>(searchEndpoint, 'GET', undefined, { 'ConsistencyLevel': 'eventual' });
         const hits = (searchResp.value || []).sort((a, b) => new Date(b.receivedDateTime).getTime() - new Date(a.receivedDateTime).getTime());
         const direct = hits.find(m => {
@@ -109,6 +97,8 @@ class MicrosoftGraphFacade {
           return preview;
         }
       } catch {}
+
+      // No search hit → fallback strategy
 
       // Fallback: recent emails and client-side filter
       const inbox = await this.mail.getEmailMessages('inbox', 100);
@@ -151,22 +141,32 @@ class MicrosoftGraphFacade {
     threadId?: string;
   }>> {
     const currentUser = await this.getCurrentUser();
-    const userEmail = currentUser.mail;
-    const sentEmails = await this.mail.getEmailMessages('sentitems', Math.min(limit, 1000));
-    const receivedEmails = await this.mail.getEmailMessages('inbox', Math.min(limit, 1000));
+    const userEmail = (currentUser.mail || (currentUser as any).userPrincipalName || '').toLowerCase();
+    // For comprehensive runs, fetch paginated messages since two years ago to ensure coverage
+    const since = new Date();
+    since.setDate(since.getDate() - HISTORY_DAYS);
+    const sinceIso = since.toISOString();
+    const usePaged = limit > 1000;
+    const sentEmails = usePaged
+      ? await this.contacts.getEmailMessagesSince('sentitems', sinceIso, GRAPH_MAX_PAGES, GRAPH_PAGE_SIZE)
+      : await this.contacts.getEmailMessagesFromPeriods('sentitems', [0, 30, 90, 180, 365]);
+    const receivedEmails = usePaged
+      ? await this.contacts.getEmailMessagesSince('inbox', sinceIso, GRAPH_MAX_PAGES, GRAPH_PAGE_SIZE)
+      : await this.contacts.getEmailMessagesFromPeriods('inbox', [0, 30, 90, 180, 365]);
 
     const interactions: Array<{
       id: string; contactId: string; subject: string; date: Date; direction: 'sent' | 'received'; isRead: boolean; isReplied: boolean; threadId?: string;
     }> = [];
 
     sentEmails.forEach(email => {
-      email.toRecipients.forEach(recipient => {
-        if (recipient.emailAddress.address !== userEmail) {
+      (email.toRecipients || []).forEach(recipient => {
+        const addr = recipient?.emailAddress?.address?.toLowerCase() || '';
+        if (addr && addr !== userEmail) {
           interactions.push({
             id: email.id,
-            contactId: recipient.emailAddress.address,
+            contactId: addr,
             subject: email.subject || 'No Subject',
-            date: new Date(email.sentDateTime || email.receivedDateTime),
+            date: new Date(email.sentDateTime || email.receivedDateTime || new Date().toISOString()),
             direction: 'sent',
             isRead: true,
             isReplied: false,
@@ -177,15 +177,15 @@ class MicrosoftGraphFacade {
     });
 
     receivedEmails.forEach(email => {
-      const senderEmail = email.from.emailAddress.address;
-      if (senderEmail !== userEmail) {
+      const senderEmail = email?.from?.emailAddress?.address?.toLowerCase() || '';
+      if (senderEmail && senderEmail !== userEmail) {
         interactions.push({
           id: email.id,
           contactId: senderEmail,
           subject: email.subject || 'No Subject',
-          date: new Date(email.receivedDateTime),
+          date: new Date(email.receivedDateTime || email.sentDateTime || new Date().toISOString()),
           direction: 'received',
-          isRead: email.isRead,
+          isRead: !!email.isRead,
           isReplied: false,
           threadId: this.extractThreadId(email.subject || '')
         });
@@ -198,20 +198,27 @@ class MicrosoftGraphFacade {
 
   async getContactsForAnalysis(options: { maxEmails?: number; useAllEmails?: boolean; quickMode?: boolean } = {}): Promise<Array<{ id: string; name: string; email: string }>> {
     const currentUser = await this.getCurrentUser();
-    const userEmail = currentUser.mail;
+    const userEmail = (currentUser.mail || (currentUser as any).userPrincipalName || '').toLowerCase();
     const { maxEmails = 10000, useAllEmails = false, quickMode = false } = options;
 
     // Outlook contacts
     const outlookRaw = await this.contacts.getContacts();
-    const outlookContacts = outlookRaw.map(c => ({ id: c.id, name: c.displayName || 'Unknown', email: c.emailAddresses[0]?.address || '' }))
+    const outlookContacts = outlookRaw
+      .map(c => {
+        const addr = (c.emailAddresses?.[0]?.address || '').toLowerCase();
+        return { id: addr, name: c.displayName || (addr.split('@')[0] || 'Unknown'), email: addr };
+      })
       .filter(c => c.email && c.email !== userEmail);
 
     let sentEmails: EmailMessage[] = [];
     let receivedEmails: EmailMessage[] = [];
     if (useAllEmails) {
-      // Fallback to a broader sample if all-emails not practical; keep behavior sane
-      sentEmails = await this.mail.getEmailMessages('sentitems', 1000);
-      receivedEmails = await this.mail.getEmailMessages('inbox', 1000);
+      // Comprehensive: fetch since HISTORY_DAYS with paging
+      const since = new Date();
+      since.setDate(since.getDate() - HISTORY_DAYS);
+      const sinceIso = since.toISOString();
+      sentEmails = await this.contacts.getEmailMessagesSince('sentitems', sinceIso, GRAPH_MAX_PAGES, GRAPH_PAGE_SIZE);
+      receivedEmails = await this.contacts.getEmailMessagesSince('inbox', sinceIso, GRAPH_MAX_PAGES, GRAPH_PAGE_SIZE);
     } else if (quickMode) {
       sentEmails = await this.mail.getEmailMessages('sentitems', 1000);
       receivedEmails = await this.mail.getEmailMessages('inbox', 1000);
@@ -222,32 +229,34 @@ class MicrosoftGraphFacade {
 
     const emailContacts = new Map<string, { id: string; name: string; email: string }>();
     sentEmails.forEach(email => {
-      email.toRecipients.forEach(recipient => {
-        if (recipient.emailAddress.address !== userEmail) {
-          emailContacts.set(recipient.emailAddress.address, {
-            id: recipient.emailAddress.address,
-            name: recipient.emailAddress.name || recipient.emailAddress.address.split('@')[0],
-            email: recipient.emailAddress.address,
+      (email.toRecipients || []).forEach(recipient => {
+        const addr = recipient?.emailAddress?.address?.toLowerCase() || '';
+        if (addr && addr !== userEmail) {
+          emailContacts.set(addr, {
+            id: addr,
+            name: recipient?.emailAddress?.name || addr.split('@')[0],
+            email: addr,
           });
         }
       });
     });
 
     receivedEmails.forEach(email => {
-      const sender = email.from.emailAddress.address;
-      if (sender !== userEmail) {
+      const sender = email?.from?.emailAddress?.address?.toLowerCase() || '';
+      if (sender && sender !== userEmail) {
         emailContacts.set(sender, {
           id: sender,
-          name: email.from.emailAddress.name || sender.split('@')[0],
+          name: email?.from?.emailAddress?.name || sender.split('@')[0],
           email: sender,
         });
       }
     });
 
-    const all: Array<{ id: string; name: string; email: string }> = [...outlookContacts];
-    emailContacts.forEach(contact => {
-      if (!all.find(c => c.email === contact.email)) all.push(contact);
-    });
+    // Deduplicate across Outlook + email-derived contacts by email (lowercase)
+    const allByEmail = new Map<string, { id: string; name: string; email: string }>();
+    outlookContacts.forEach(c => { if (!allByEmail.has(c.email)) allByEmail.set(c.email, c); });
+    emailContacts.forEach(c => { if (!allByEmail.has(c.email)) allByEmail.set(c.email, c); });
+    const all: Array<{ id: string; name: string; email: string }> = Array.from(allByEmail.values());
     if (DEBUG_GRAPH) console.log(`Found ${outlookContacts.length} Outlook contacts and ${emailContacts.size} email contacts (${all.length} total)`);
     return all.slice(0, maxEmails); // safety cap
   }

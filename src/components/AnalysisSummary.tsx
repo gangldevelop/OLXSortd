@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ContactSearch } from './ContactSearch';
 import type { ContactWithAnalysis } from '../types/contact';
 import { SNOOZE_DURATIONS } from '../types';
-import { getCategoryColorClasses, getCategoryIcon } from '../utils/contactCategory';
+import { getCategoryColorClasses, getCategoryIcon, getCategoryTooltip, getCategoryLabel } from '../utils/contactCategory';
 
 export function AnalysisSummary({
   contacts,
@@ -20,16 +20,15 @@ export function AnalysisSummary({
   const [needsAttentionContacts, setNeedsAttentionContacts] = useState<ContactWithAnalysis[]>([]);
   const summary = {
     total: contacts.length,
-    frequent: contacts.filter((c) => c.category === 'frequent').length,
-    inactive: contacts.filter((c) => c.category === 'inactive').length,
-    warm: contacts.filter((c) => c.category === 'warm').length,
-    hot: contacts.filter((c) => c.category === 'hot').length,
-    cold: contacts.filter((c) => c.category === 'cold').length,
+    active: contacts.filter((c) => c.category === 'active').length,
+    engaged: contacts.filter((c) => c.category === 'engaged').length,
+    dormant: contacts.filter((c) => c.category === 'dormant').length,
   };
 
   const contactsNeedingAttention = useMemo(() => {
     return contacts
-      .filter((contact) => contact.category === 'inactive' || (contact.category === 'cold' && contact.emailCount > 0))
+      .filter((contact) => !(contact.tags || []).includes('crossware'))
+      .filter((contact) => contact.category === 'dormant' && contact.emailCount > 0)
       .sort((a, b) => {
         if (a.responseRate !== b.responseRate) {
           return b.responseRate - a.responseRate;
@@ -40,6 +39,9 @@ export function AnalysisSummary({
         return 0;
       });
   }, [contacts]);
+
+  const resellerContacts = useMemo(() => contacts.filter((c) => (c.tags || []).includes('reseller')), [contacts]);
+  const crosswareContacts = useMemo(() => contacts.filter((c) => (c.tags || []).includes('crossware')), [contacts]);
 
   useEffect(() => {
     setNeedsAttentionContacts(contactsNeedingAttention);
@@ -58,39 +60,25 @@ export function AnalysisSummary({
             All ({summary.total})
           </button>
           <button
-            onClick={() => onCategoryClick('frequent')}
+            onClick={() => onCategoryClick('active')}
             className="px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-700 hover:bg-green-200 transition-colors"
-            title="Show frequent contacts"
+            title={`${getCategoryLabel('active')} — ${getCategoryTooltip('active')}`}
           >
-            Frequent ({summary.frequent})
+            {getCategoryLabel('active')} ({summary.active})
           </button>
           <button
-            onClick={() => onCategoryClick('inactive')}
-            className="px-2 py-1 rounded text-xs font-medium bg-orange-100 text-orange-700 hover:bg-orange-200 transition-colors"
-            title="Show inactive contacts"
+            onClick={() => onCategoryClick('engaged')}
+            className="px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors"
+            title={`${getCategoryLabel('engaged')} — ${getCategoryTooltip('engaged')}`}
           >
-            Inactive ({summary.inactive})
+            {getCategoryLabel('engaged')} ({summary.engaged})
           </button>
           <button
-            onClick={() => onCategoryClick('warm')}
-            className="px-2 py-1 rounded text-xs font-medium bg-yellow-100 text-yellow-700 hover:bg-yellow-200 transition-colors"
-            title="Show warm contacts"
-          >
-            Warm ({summary.warm})
-          </button>
-          <button
-            onClick={() => onCategoryClick('hot')}
-            className="px-2 py-1 rounded text-xs font-medium bg-red-100 text-red-700 hover:bg-red-200 transition-colors"
-            title="Show hot contacts"
-          >
-            Hot ({summary.hot})
-          </button>
-          <button
-            onClick={() => onCategoryClick('cold')}
+            onClick={() => onCategoryClick('dormant')}
             className="px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
-            title="Show cold contacts"
+            title={`${getCategoryLabel('dormant')} — ${getCategoryTooltip('dormant')}`}
           >
-            Cold ({summary.cold})
+            {getCategoryLabel('dormant')} ({summary.dormant})
           </button>
         </div>
       </div>
@@ -126,8 +114,8 @@ export function AnalysisSummary({
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-sm">{getCategoryIcon(contact.category)}</span>
                       <p className="text-xs font-medium text-gray-900 truncate">{contact.name}</p>
-                      <span className={`px-1.5 py-0.5 text-xs font-medium rounded border ${getCategoryColor(contact.category)}`}>
-                        {contact.category}
+                      <span title={getCategoryTooltip(contact.category)} className={`px-1.5 py-0.5 text-xs font-medium rounded border ${getCategoryColor(contact.category)}`}>
+                        {getCategoryLabel(contact.category)}
                       </span>
                     </div>
                     <div className="flex items-center gap-3 text-xs text-gray-600">
@@ -172,6 +160,62 @@ export function AnalysisSummary({
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* Reseller Portal Section */}
+      {resellerContacts.length > 0 && (
+        <div className="bg-white rounded border p-2">
+          <h3 className="text-sm font-semibold text-gray-900 mb-2">Reseller Portal ({resellerContacts.length})</h3>
+          <div className="max-h-48 overflow-y-auto space-y-1.5">
+            {resellerContacts.map((contact) => (
+                <div
+                  key={contact.id}
+                  className="flex items-start justify-between p-1.5 bg-gray-50 rounded hover:bg-gray-100 transition-colors cursor-pointer"
+                  onClick={() => onShowContactDetails(contact)}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="text-xs font-medium text-gray-900 truncate">{contact.name}</p>
+                      <span className="px-1.5 py-0.5 text-[10px] font-medium rounded border bg-indigo-50 text-indigo-700 border-indigo-100">Reseller</span>
+                    </div>
+                    <p className="text-[11px] text-gray-600 truncate">{contact.email}</p>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDraftEmail(contact);
+                    }}
+                    className="text-xs text-primary-600 hover:text-primary-700 font-medium px-2 py-1 hover:bg-primary-50 rounded transition-colors ml-2"
+                  >
+                    Draft
+                  </button>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+
+      {/* Crossware Customers Section */}
+      {crosswareContacts.length > 0 && (
+        <div className="bg-white rounded border p-2">
+          <h3 className="text-sm font-semibold text-gray-900 mb-2">Crossware Customers ({crosswareContacts.length})</h3>
+          <div className="max-h-48 overflow-y-auto space-y-1.5">
+            {crosswareContacts.map((contact) => (
+                <div
+                  key={contact.id}
+                  className="flex items-start justify-between p-1.5 bg-gray-50 rounded"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="text-xs font-medium text-gray-900 truncate">{contact.name}</p>
+                      <span className="px-1.5 py-0.5 text-[10px] font-medium rounded border bg-gray-100 text-gray-700 border-gray-200">Crossware</span>
+                    </div>
+                    <p className="text-[11px] text-gray-600 truncate">{contact.email}</p>
+                  </div>
+                </div>
+              ))}
           </div>
         </div>
       )}

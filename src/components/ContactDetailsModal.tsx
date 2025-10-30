@@ -1,6 +1,6 @@
 import DOMPurify from 'dompurify';
 import type { ContactWithAnalysis } from '../types/contact';
-import { getCategoryPillClasses } from '../utils/contactCategory';
+import { getCategoryPillClasses, getCategoryLabel } from '../utils/contactCategory';
 
 export function ContactDetailsModal({
   contact,
@@ -51,7 +51,7 @@ export function ContactDetailsModal({
               <div className="text-gray-500 font-medium">Category</div>
               <div className="mt-1">
                 <span className={`px-1.5 py-0.5 rounded-full text-xs font-medium ${getCategoryPillClasses(contact.category)}`}>
-                  {contact.category}
+                  {getCategoryLabel(contact.category)}
                 </span>
               </div>
             </div>

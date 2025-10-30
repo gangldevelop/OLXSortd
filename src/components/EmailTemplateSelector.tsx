@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import type { EmailTemplate } from '../types/email';
+import type { ContactCategory } from '../types/contact';
 import { emailTemplates } from '../data/emailTemplates';
+import { getCategoryLabel } from '../utils/contactCategory';
 
 interface EmailTemplateSelectorProps {
-  selectedCategory: 'frequent' | 'inactive' | 'cold' | 'warm' | 'hot';
+  selectedCategory: ContactCategory;
   onTemplateSelect: (template: EmailTemplate) => void;
 }
 
@@ -28,7 +30,7 @@ export function EmailTemplateSelector({ selectedCategory, onTemplateSelect }: Em
   return (
     <div className="bg-white rounded border p-3">
       <h3 className="text-sm font-semibold text-gray-900 mb-3">
-        Templates - {selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)}
+        Templates - {getCategoryLabel(selectedCategory)}
       </h3>
       
       {categoryTemplates.length === 0 ? (

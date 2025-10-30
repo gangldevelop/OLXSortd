@@ -1,9 +1,11 @@
+import type { ContactCategory } from './contact';
+
 export interface EmailTemplate {
   id: string;
   name: string;
   subject: string;
   body: string;
-  category: 'frequent' | 'inactive' | 'cold' | 'warm' | 'hot';
+  category: ContactCategory;
   variables: string[];
 }
 

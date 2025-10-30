@@ -67,13 +67,18 @@ export function ContactSearch({
     if (filterOptions.lastContactFilter !== 'all') {
       const now = Date.now();
       filtered = filtered.filter(contact => {
-        if (!contact.lastContactDate) return filterOptions.lastContactFilter === 'never';
+        // New logic: 'once' filters by exactly one email interaction
+        if (filterOptions.lastContactFilter === 'once') {
+          return (contact.emailCount ?? 0) === 1;
+        }
+        // For time-based filters, exclude contacts with no lastContactDate
+        if (!contact.lastContactDate) return false;
         const daysSince = Math.floor((now - contact.lastContactDate.getTime()) / (24 * 60 * 60 * 1000));
         switch (filterOptions.lastContactFilter) {
-          case 'never': return !contact.lastContactDate;
           case 'recent': return daysSince <= 7;
           case 'month': return daysSince <= 30;
           case 'old': return daysSince > 30;
+          case 'year': return daysSince > 365;
           default: return true;
         }
       });
@@ -212,7 +217,8 @@ export function ContactSearch({
           <option value="recent">Last 7 days</option>
           <option value="month">Last 30 days</option>
           <option value="old">Older than 30 days</option>
-          <option value="never">Never contacted</option>
+          <option value="year">Over 1 year</option>
+          <option value="once">Contacted Once</option>
         </select>
 
         <select
