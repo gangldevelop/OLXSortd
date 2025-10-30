@@ -2,15 +2,36 @@
 
 **Smart Email Contact Management & Cold Outreach Tool for Outlook & Gmail**
 
-OLXSortd is an intelligent email contact management system that analyzes your email interactions to categorize contacts and streamline your outreach efforts. Built as an Outlook Add-in and Gmail extension, it helps you identify warm leads, reconnect with inactive contacts, and optimize your email communication strategy.
+OLXSortd is an intelligent email contact management system focused on **outreach to contacts that have been contacted before but haven't been contacted in a while**. The app analyzes your email interactions to automatically categorize contacts and helps you **follow up and check in with contacts to potentially restart old leads**. Built as an Outlook Add-in and Gmail extension, it identifies opportunities for re-engagement and streamlines your outreach efforts.
 
 ## ✨ Features
 
 ### 🧠 Intelligent Contact Analysis
-- **Smart Categorization**: Automatically categorizes contacts into Frequent, Warm, Hot, Cold, and Inactive based on email patterns
+- **Smart Categorization**: Automatically categorizes contacts into **Recent**, **In Touch**, and **Inactive** based on email interaction patterns
 - **Response Rate Tracking**: Calculates response rates and engagement metrics for each contact
 - **Behavioral Insights**: Analyzes email frequency, response times, and conversation patterns
 - **Performance Optimization**: Uses Web Workers for fast analysis of large contact databases (10,000+ contacts)
+
+#### Contact Categorization Logic
+
+The system automatically categorizes contacts based on their email interaction history:
+
+**📅 Recent** (`recent`)
+- Contacts with recent activity (last contact ≤ 30 days ago), OR
+- High recent email frequency (≥ 2 emails in last 30 days), OR
+- Good recent engagement (≥ 5 emails in last 90 days with ≥ 20% response rate)
+- *These contacts are actively engaged and should be nurtured*
+
+**🤝 In Touch** (`in_touch`)
+- Contacts with good historical relationship (≥ 3 total emails)
+- Decent responsiveness (≥ 30% response rate)
+- Last contact within 120 days (about 4 months)
+- *These contacts have a solid relationship but aren't very recent*
+
+**⏰ Inactive** (`inactive`)
+- All other contacts (long time since last touch or very sparse history)
+- Contacts that haven't been contacted in a while or have minimal interaction
+- *These contacts need re-engagement to restart old leads*
 
 ### 🔍 Advanced Search & Filtering
 - **Real-time Search**: Search contacts by name, email, or company
@@ -19,16 +40,57 @@ OLXSortd is an intelligent email contact management system that analyzes your em
 - **Quick Access**: One-click filtering by contact category
 
 ### 📝 Professional Email Templates
-- **Category-Specific Templates**: Tailored templates for each contact category
+- **Category-Specific Templates**: Tailored email templates dynamically matched to each contact's category (Recent, In Touch, Inactive)
 - **Rich Text Editor**: Full-featured email composition with formatting options
-- **Variable Substitution**: Dynamic placeholders for personalization
+- **Variable Substitution**: Dynamic placeholders (`{{name}}`, `{{senderName}}`, `{{company}}`, etc.) for personalization
 - **Template Management**: Easy template selection and customization
+- **Smart Template Selection**: When you click "Draft" on a contact, the suggested templates automatically match their category
+
+#### Email Template System
+
+Each contact category has specialized email templates:
+
+- **Recent Contacts**: Templates for quick check-ins and maintaining active relationships
+- **In Touch Contacts**: Templates for following up on previous conversations and maintaining momentum
+- **Inactive Contacts**: Templates for reconnecting with contacts that have gone quiet, restarting old leads
 
 ### 📊 Analytics Dashboard
 - **Contact Overview**: Visual summary of contact categories and metrics
-- **Needs Attention**: Prioritized list of contacts requiring follow-up
+- **Needs Attention**: Intelligently prioritized list of contacts requiring follow-up and re-engagement
 - **Performance Metrics**: Response rates, engagement statistics, and trends
 - **Progress Tracking**: Real-time analysis progress with detailed status updates
+
+#### "Needs Attention" Logic
+
+The **Needs Attention** section identifies contacts that are prime candidates for outreach and re-engagement. This is the core feature designed to help you **restart old leads** and **follow up with contacts that haven't been contacted in a while**.
+
+**Inclusion Criteria:**
+
+A contact appears in "Needs Attention" if they meet ALL of the following:
+1. ✅ Have been contacted before (`emailCount > 0`)
+2. ✅ Have a last contact date recorded
+3. ✅ Haven't been contacted in at least **30 days**
+4. ✅ Not tagged as "crossware"
+
+**Category-Specific Rules:**
+
+- **Inactive Contacts**: All inactive contacts with email history are included
+- **In Touch Contacts**: Included if last contact was **60+ days ago** (good history but needs check-in)
+- **Recent Contacts**: Included if last contact was **30+ days ago** (catching slipping relationships early)
+
+**Prioritization Algorithm:**
+
+Contacts are sorted by priority (highest first):
+1. **Response Rate** (highest first) - Contacts with better historical response rates are prioritized
+2. **Email Count** (highest first) - Contacts with more email history indicate more valuable relationships
+3. **Days Since Last Contact** (most urgent first) - Contacts that haven't been contacted for longer periods are prioritized
+
+**Why This Works:**
+
+- 🎯 **Catches slipping relationships early**: Includes recent contacts that are starting to go stale (30+ days)
+- 💎 **Includes valuable relationships**: In Touch contacts with good history but need re-engagement (60+ days)
+- 📊 **Data-driven prioritization**: Focuses on contacts most likely to respond (higher response rates and more history)
+- ⏰ **Time-based filtering**: Only shows contacts that actually need attention (minimum 30 days threshold)
 
 ### 🚀 Performance Features
 - **Quick Analysis**: Fast analysis of recent contacts (~30 seconds)
@@ -150,9 +212,11 @@ For detailed Azure configuration, see [AZURE_SETUP.md](./AZURE_SETUP.md).
 - **Send or Save**: Send immediately or save as draft
 
 ### 5. Needs Attention
-- Review contacts that need follow-up based on analysis
-- Prioritize outreach efforts using engagement metrics
-- Track response rates and communication patterns
+- **Automated Detection**: System automatically identifies contacts that need follow-up
+- **Smart Prioritization**: Contacts are sorted by response rate, email history, and recency
+- **Multi-Category Inclusion**: Includes Inactive, In Touch (60+ days), and Recent (30+ days) contacts
+- **One-Click Drafting**: Click "Draft" to instantly compose re-engagement emails with category-matched templates
+- **Tracking**: Monitor which contacts you've reached out to and their response patterns
 
 ## 🔧 Development
 
@@ -191,6 +255,37 @@ The project follows a clean architecture pattern:
 - **Responsive Design**: Mobile-first approach with Tailwind CSS
 - **Error Handling**: Graceful error handling with user feedback
 
+## 🧬 How It Works
+
+### Contact Analysis Process
+
+1. **Email Collection**: Fetches all email interactions from your Outlook/Gmail account
+2. **Interaction Analysis**: For each contact, analyzes:
+   - Total email count (sent and received)
+   - Response rate (percentage of sent emails that received replies)
+   - Days since last contact
+   - Email frequency in last 30/90 days
+   - Conversation threads and patterns
+3. **Category Assignment**: Assigns each contact to Recent, In Touch, or Inactive based on the categorization logic
+4. **Confidence Scoring**: Calculates a confidence score (0-100) based on:
+   - Amount of data available (more emails = higher confidence)
+   - Recency of activity (recent activity = higher confidence)
+   - Response rate (better response rate = higher confidence)
+   - Category-specific adjustments
+5. **Insights Generation**: Creates human-readable insights about each contact's communication patterns
+
+### Analysis Metrics
+
+The system calculates these key metrics for each contact:
+
+- **Total Emails**: Total number of email interactions
+- **Sent Emails**: Number of emails you sent to this contact
+- **Received Emails**: Number of emails received from this contact
+- **Response Rate**: Percentage of your sent emails that received replies (calculated thread-aware)
+- **Days Since Last Contact**: Number of days since the last email interaction
+- **Average Response Time**: Average time (in hours) for the contact to respond
+- **Conversation Count**: Number of distinct email threads/conversations
+
 ## 📊 Performance
 
 ### Analysis Performance
@@ -204,6 +299,7 @@ The project follows a clean architecture pattern:
 - **Memoized Calculations**: Cached analysis results for repeated operations
 - **Lazy Loading**: Components loaded on demand
 - **Efficient Rendering**: Optimized React rendering with proper keys
+- **Thread-Aware Calculations**: Response rate calculation considers email threads for accuracy
 
 ## 🔒 Security
 
@@ -305,6 +401,7 @@ npm run build
 - **v0.0.2** - Added Web Workers for performance
 - **v0.0.3** - Enhanced search and filtering capabilities
 - **v0.0.4** - Improved email editor and template system
+- **v0.0.5** - Refined categorization system (Recent, In Touch, Inactive) with improved "Needs Attention" logic for better outreach targeting
 
 ---
 

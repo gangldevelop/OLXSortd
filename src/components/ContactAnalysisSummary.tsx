@@ -8,18 +8,18 @@ interface ContactAnalysisSummaryProps {
 export function ContactAnalysisSummary({ contacts, onContactSelect }: ContactAnalysisSummaryProps) {
   const summary = {
     total: contacts.length,
-    active: contacts.filter(c => c.category === 'active').length,
-    engaged: contacts.filter(c => c.category === 'engaged').length,
-    dormant: contacts.filter(c => c.category === 'dormant').length,
+    recent: contacts.filter(c => c.category === 'recent').length,
+    in_touch: contacts.filter(c => c.category === 'in_touch').length,
+    inactive: contacts.filter(c => c.category === 'inactive').length,
   };
 
   const getCategoryColor = (category: string) => {
     switch (category) {
-      case 'active': // Recent
+      case 'recent': // Recent
         return 'bg-green-100 text-green-800 border-green-200';
-      case 'engaged': // In Touch
+      case 'in_touch': // In Touch
         return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'dormant': // Inactive
+      case 'inactive': // Inactive
         return 'bg-orange-100 text-orange-800 border-orange-200';
       default:
         return 'bg-gray-100 text-gray-800 border-gray-200';
@@ -28,20 +28,18 @@ export function ContactAnalysisSummary({ contacts, onContactSelect }: ContactAna
 
   const getCategoryIcon = (category: string) => {
     switch (category) {
-      case 'active':
+      case 'recent':
         return '🔥';
-      case 'engaged':
+      case 'in_touch':
         return '🤝';
-      case 'dormant':
+      case 'inactive':
         return '⏰';
       default:
         return '❓';
     }
   };
 
-  const contactsNeedingAttention = contacts.filter(contact => 
-    contact.category === 'dormant'
-  );
+  const contactsNeedingAttention = contacts.filter(contact => contact.category === 'inactive');
 
   return (
     <div className="space-y-6">
@@ -55,15 +53,15 @@ export function ContactAnalysisSummary({ contacts, onContactSelect }: ContactAna
             <div className="text-sm text-gray-600">Total</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-green-600">{summary.active}</div>
+            <div className="text-2xl font-bold text-green-600">{summary.recent}</div>
             <div className="text-sm text-gray-600">Recent</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-blue-600">{summary.engaged}</div>
+            <div className="text-2xl font-bold text-blue-600">{summary.in_touch}</div>
             <div className="text-sm text-gray-600">In Touch</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-orange-600">{summary.dormant}</div>
+            <div className="text-2xl font-bold text-orange-600">{summary.inactive}</div>
             <div className="text-sm text-gray-600">Inactive</div>
           </div>
         </div>
@@ -125,37 +123,37 @@ export function ContactAnalysisSummary({ contacts, onContactSelect }: ContactAna
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Key Insights</h3>
         
         <div className="space-y-3">
-          {summary.active > 0 && (
+          {summary.recent > 0 && (
             <div className="flex items-start gap-3 p-3 bg-green-50 rounded-lg">
               <span className="text-green-600 text-lg">🔥</span>
               <div>
                 <p className="font-medium text-green-900">Recent Relationships</p>
                 <p className="text-sm text-green-700">
-                  {summary.active} contacts had recent interactions. Keep nurturing these relationships.
+                  {summary.recent} contacts had recent interactions. Keep nurturing these relationships.
                 </p>
               </div>
             </div>
           )}
           
-          {summary.engaged > 0 && (
+          {summary.in_touch > 0 && (
             <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg">
               <span className="text-blue-600 text-lg">🤝</span>
               <div>
                 <p className="font-medium text-blue-900">In Touch</p>
                 <p className="text-sm text-blue-700">
-                  {summary.engaged} contacts are in active conversation. Maintain momentum.
+                  {summary.in_touch} contacts are in active conversation. Maintain momentum.
                 </p>
               </div>
             </div>
           )}
 
-          {summary.dormant > 0 && (
+          {summary.inactive > 0 && (
             <div className="flex items-start gap-3 p-3 bg-orange-50 rounded-lg">
               <span className="text-orange-600 text-lg">⏰</span>
               <div>
                 <p className="font-medium text-orange-900">Reconnect Opportunities</p>
                 <p className="text-sm text-orange-700">
-                  {summary.dormant} contacts have gone quiet. Consider reaching out to rekindle these relationships.
+                  {summary.inactive} contacts have gone quiet. Consider reaching out to rekindle these relationships.
                 </p>
               </div>
             </div>

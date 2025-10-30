@@ -10,29 +10,6 @@ import type {
  * Analyzes email communication patterns to automatically categorize contacts
  */
 export class ContactAnalyzer {
-  private readonly config: ContactAnalysisConfig;
-
-  constructor(config?: Partial<ContactAnalysisConfig>) {
-    this.config = {
-      frequent: {
-        minEmailsLast30Days: 3,
-        maxDaysSinceLastContact: 7,
-        minResponseRate: 0.6,
-        ...config?.frequent
-      },
-      inactive: {
-        minDaysSinceLastContact: 30,
-        maxDaysSinceLastContact: 90,
-        minPreviousEmails: 2,
-        ...config?.inactive
-      },
-      cold: {
-        maxEmailsTotal: 2,
-        maxDaysSinceLastContact: 90,
-        ...config?.cold
-      }
-    };
-  }
 
   /**
    * Analyzes a contact's email interactions and determines their category
@@ -134,26 +111,26 @@ export class ContactAnalyzer {
    * Determines contact category based on metrics and interactions
    */
   private determineCategory(metrics: ReturnType<ContactAnalyzer['calculateMetrics']>): ContactCategory {
-    // ACTIVE: recent or frequent touch and some responsiveness
+    // RECENT: recent or frequent touch and some responsiveness
     if (
       metrics.daysSinceLastContact <= 30 ||
       metrics.emailsLast30Days >= 2 ||
       (metrics.emailsLast90Days >= 5 && metrics.responseRate >= 0.2)
     ) {
-      return 'active';
+      return 'recent';
     }
 
-    // ENGAGED: good history and reasonable responsiveness in last ~4 months
+    // IN_TOUCH: good history and reasonable responsiveness in last ~4 months
     if (
       metrics.totalEmails >= 3 &&
       metrics.responseRate >= 0.3 &&
       metrics.daysSinceLastContact <= 120
     ) {
-      return 'engaged';
+      return 'in_touch';
     }
 
-    // DORMANT: everyone else (long time since last touch or very sparse history)
-    return 'dormant';
+    // INACTIVE: everyone else (long time since last touch or very sparse history)
+    return 'inactive';
   }
 
   /**
@@ -177,13 +154,13 @@ export class ContactAnalyzer {
     // Category-specific adjustments
     // Category weights adjusted for simplified model
     switch (category) {
-      case 'active':
+      case 'recent':
         score += 10;
         break;
-      case 'engaged':
+      case 'in_touch':
         score += 5;
         break;
-      case 'dormant':
+      case 'inactive':
         score -= 10;
         break;
     }
@@ -197,7 +174,7 @@ export class ContactAnalyzer {
   private generateInsights(metrics: ReturnType<ContactAnalyzer['calculateMetrics']>, category: ContactCategory): string[] {
     const insights: string[] = [];
 
-    if (category === 'active') {
+    if (category === 'recent') {
       insights.push(`Active communication with ${metrics.totalEmails} emails`);
       if (metrics.daysSinceLastContact < 3) {
         insights.push('Very recent contact - relationship is active');
@@ -205,13 +182,13 @@ export class ContactAnalyzer {
       if (metrics.responseRate > 0.8) {
         insights.push('Excellent response rate - highly engaged contact');
       }
-    } else if (category === 'engaged') {
+    } else if (category === 'in_touch') {
       insights.push('Good relationship - not very recent but responsive');
       insights.push(`Last contact ${metrics.daysSinceLastContact} days ago`);
       if (metrics.responseRate > 0.5) {
         insights.push('Good historical response rate - likely to re-engage');
       }
-    } else if (category === 'dormant') {
+    } else if (category === 'inactive') {
       insights.push('Limited communication history');
       if (metrics.totalEmails === 0) {
         insights.push('Never contacted - perfect for cold outreach');

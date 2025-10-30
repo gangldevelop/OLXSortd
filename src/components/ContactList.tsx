@@ -12,11 +12,11 @@ export function ContactList({ contacts, onDraftEmail, onViewEmail, onSnooze }: C
 
   const getCategoryColor = (category: ContactWithAnalysis['category']) => {
     switch (category) {
-      case 'active':
+      case 'recent':
         return 'bg-green-100 text-green-800';
-      case 'engaged':
+      case 'in_touch':
         return 'bg-blue-100 text-blue-800';
-      case 'dormant':
+      case 'inactive':
         return 'bg-gray-100 text-gray-800';
       default:
         return 'bg-gray-100 text-gray-800';

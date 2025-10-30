@@ -68,7 +68,7 @@ export class ContactAnalysisService {
         lastContactDate,
         emailCount: contactInteractions.length,
         responseRate: analysis.metrics.responseRate,
-        isActive: analysis.category === 'active',
+        isActive: analysis.category === 'recent',
         lastEmailSubject,
         tags: this.generateTags(contact.email, analysis)
       };
@@ -119,7 +119,7 @@ export class ContactAnalysisService {
         lastContactDate,
         emailCount: contactInteractions.length,
         responseRate: analysis.metrics.responseRate,
-        isActive: analysis.category === 'active',
+        isActive: analysis.category === 'recent',
         lastEmailSubject,
         tags: this.generateTags(contact.email, analysis)
       };
@@ -136,9 +136,9 @@ export class ContactAnalysisService {
   public getAnalysisSummary(contacts: ContactWithAnalysis[]) {
     const summary = {
       total: contacts.length,
-      active: contacts.filter(c => c.category === 'active').length,
-      engaged: contacts.filter(c => c.category === 'engaged').length,
-      dormant: contacts.filter(c => c.category === 'dormant').length,
+      recent: contacts.filter(c => c.category === 'recent').length,
+      in_touch: contacts.filter(c => c.category === 'in_touch').length,
+      inactive: contacts.filter(c => c.category === 'inactive').length,
       averageResponseRate: 0,
       averageConfidenceScore: 0
     };
@@ -162,7 +162,7 @@ export class ContactAnalysisService {
   public getContactsNeedingAttention(contacts: ContactWithAnalysis[]): ContactWithAnalysis[] {
     return contacts.filter(contact => {
       // Dormant contacts with some previous interaction or promising response rate
-      if (contact.category === 'dormant' && (contact.emailCount > 0 || contact.responseRate > 0.3)) {
+      if (contact.category === 'inactive' && (contact.emailCount > 0 || contact.responseRate > 0.3)) {
         return true;
       }
 

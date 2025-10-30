@@ -1,6 +1,6 @@
 import type { ContactCategory } from './contact';
 
-export const CONTACT_CATEGORIES = ['active', 'engaged', 'dormant'] as const;
+export const CONTACT_CATEGORIES = ['recent', 'in_touch', 'inactive'] as const;
 export type { ContactCategory } from './contact';
 
 export const SNOOZE_DURATIONS = [7, 14, 30] as const;
