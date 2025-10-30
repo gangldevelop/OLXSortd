@@ -1,7 +1,6 @@
 import type { 
   ContactWithAnalysis, 
-  EmailInteraction, 
-  ContactAnalysisConfig 
+  EmailInteraction
 } from '../types/contact';
 import { ContactAnalyzer } from './contactAnalyzer';
 import { isCrosswareEmail, isResellerEmail } from '../utils/segmentation';
@@ -13,8 +12,8 @@ export class ContactAnalysisService {
   private analyzer: ContactAnalyzer;
   private analysisCache: Map<string, ContactWithAnalysis> = new Map();
 
-  constructor(config?: Partial<ContactAnalysisConfig>) {
-    this.analyzer = new ContactAnalyzer(config);
+  constructor() {
+    this.analyzer = new ContactAnalyzer();
   }
 
   /**
@@ -182,11 +181,10 @@ export class ContactAnalysisService {
   }
 
   /**
-   * Updates analysis configuration
+   * Clears the analysis cache
    */
-  public updateConfig(config: Partial<ContactAnalysisConfig>): void {
-    this.analyzer = new ContactAnalyzer(config);
-    this.analysisCache.clear(); // Clear cache when config changes
+  public clearCache(): void {
+    this.analysisCache.clear();
   }
 
   /**

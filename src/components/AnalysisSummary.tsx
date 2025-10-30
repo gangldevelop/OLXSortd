@@ -229,7 +229,7 @@ export function AnalysisSummary({
       {/* Crossware Customers Section */}
       {crosswareContacts.length > 0 && (
         <div className="bg-white rounded border p-2">
-          <h3 className="text-sm font-semibold text-gray-900 mb-2">Crossware Contacs ({crosswareContacts.length})</h3>
+          <h3 className="text-sm font-semibold text-gray-900 mb-2">Crossware Contacts ({crosswareContacts.length})</h3>
           <div className="max-h-48 overflow-y-auto space-y-1.5">
             {crosswareContacts.map((contact) => (
                 <div

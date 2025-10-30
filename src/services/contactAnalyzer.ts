@@ -1,6 +1,5 @@
 import type { 
   ContactAnalysis, 
-  ContactAnalysisConfig, 
   ContactCategory, 
   EmailInteraction 
 } from '../types/contact';
