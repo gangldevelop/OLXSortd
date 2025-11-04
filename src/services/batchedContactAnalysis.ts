@@ -13,6 +13,192 @@ export interface BatchedAnalysisOptions {
   onError?: (error: Error) => void;
 }
 
+type SerializableInteraction = {
+  id: string;
+  contactId: string;
+  subject: string;
+  date: number;
+  direction: 'sent' | 'received';
+  isRead: boolean;
+  isReplied: boolean;
+  threadId?: string;
+};
+
+type WorkerJobPayload = {
+  contacts: Array<{ id: string; name: string; email: string }>;
+  chunkSize: number;
+};
+
+type WorkerTask = {
+  jobId: string;
+  payload: WorkerJobPayload;
+  resolve: (value: ContactWithAnalysis[]) => void;
+  reject: (reason: Error) => void;
+  onProgress?: (processed: number, total: number) => void;
+};
+
+type WorkerWrapper = {
+  worker: Worker;
+  busy: boolean;
+  ready: boolean;
+  currentTask?: WorkerTask;
+};
+
+class WorkerPool {
+  private readonly workers: WorkerWrapper[] = [];
+  private readonly queue: WorkerTask[] = [];
+  private readonly maxWorkers: number;
+  private readonly serializedInteractions: Record<string, SerializableInteraction[]>;
+
+  constructor(
+    maxWorkers: number,
+    serializedInteractions: Record<string, SerializableInteraction[]>
+  ) {
+    this.maxWorkers = maxWorkers;
+    this.serializedInteractions = serializedInteractions;
+  }
+
+  runJob(
+    jobId: string,
+    payload: WorkerJobPayload,
+    onProgress?: (processed: number, total: number) => void
+  ): Promise<ContactWithAnalysis[]> {
+    return new Promise<ContactWithAnalysis[]>((resolve, reject) => {
+      this.queue.push({ jobId, payload, resolve, reject, onProgress });
+      this.processQueue();
+    });
+  }
+
+  async destroy(): Promise<void> {
+    while (this.queue.length > 0) {
+      const pending = this.queue.shift();
+      pending?.reject(new Error('Worker pool destroyed'));
+    }
+
+    await Promise.all(
+      this.workers.map(async wrapper => {
+        if (wrapper.currentTask) {
+          wrapper.currentTask.reject(new Error('Worker pool destroyed'));
+          wrapper.currentTask = undefined;
+        }
+        wrapper.worker.terminate();
+      })
+    );
+
+    this.workers.splice(0, this.workers.length);
+  }
+
+  private processQueue(): void {
+    while (this.queue.length > 0) {
+      const wrapper = this.getAvailableWorker();
+      if (!wrapper) {
+        break;
+      }
+
+      const task = this.queue.shift();
+      if (!task) {
+        return;
+      }
+
+      this.startTask(wrapper, task);
+    }
+  }
+
+  private startTask(wrapper: WorkerWrapper, task: WorkerTask): void {
+    wrapper.busy = true;
+    wrapper.currentTask = task;
+
+    const messageHandler = (event: MessageEvent) => {
+      const data = event.data as
+        | { type: 'ready' }
+        | { jobId: string; type: 'progress'; processed?: number; total?: number }
+        | { jobId: string; type: 'result'; analyzedContacts?: ContactWithAnalysis[] };
+
+      if (!data) {
+        return;
+      }
+
+      if (data.type === 'ready') {
+        wrapper.ready = true;
+        if (!wrapper.busy) {
+          this.processQueue();
+        }
+        return;
+      }
+
+      if (!('jobId' in data) || data.jobId !== task.jobId) {
+        return;
+      }
+
+      if (data.type === 'progress') {
+        task.onProgress?.(data.processed ?? 0, data.total ?? task.payload.contacts.length);
+        return;
+      }
+
+      if (data.type === 'result') {
+        wrapper.worker.removeEventListener('message', messageHandler);
+        wrapper.worker.removeEventListener('error', errorHandler);
+        wrapper.busy = false;
+        wrapper.currentTask = undefined;
+        try {
+          task.resolve(data.analyzedContacts ?? []);
+        } catch (error) {
+          task.reject(error as Error);
+        }
+        this.processQueue();
+      }
+    };
+
+    const errorHandler = (event: ErrorEvent) => {
+      wrapper.worker.removeEventListener('message', messageHandler);
+      wrapper.worker.removeEventListener('error', errorHandler);
+      wrapper.busy = false;
+      wrapper.currentTask = undefined;
+      task.reject(event.error || new Error(event.message));
+      this.processQueue();
+    };
+
+    wrapper.worker.addEventListener('message', messageHandler);
+    wrapper.worker.addEventListener('error', errorHandler);
+
+    wrapper.worker.postMessage({ type: 'job', jobId: task.jobId, ...task.payload });
+  }
+
+  private getAvailableWorker(): WorkerWrapper | undefined {
+    const idleWorker = this.workers.find(wrapper => wrapper.ready && !wrapper.busy);
+    if (idleWorker) {
+      return idleWorker;
+    }
+
+    if (this.workers.length >= this.maxWorkers) {
+      return undefined;
+    }
+
+    this.createWorker();
+    return undefined;
+  }
+
+  private createWorker(): void {
+    const worker = new (AnalysisWorker as unknown as { new (): Worker })();
+    const wrapper: WorkerWrapper = { worker, busy: true, ready: false };
+
+    const onMessage = (event: MessageEvent) => {
+      const data = event.data as { type?: string };
+      if (data?.type === 'ready') {
+        worker.removeEventListener('message', onMessage);
+        wrapper.ready = true;
+        wrapper.busy = false;
+        this.processQueue();
+      }
+    };
+
+    worker.addEventListener('message', onMessage);
+    worker.postMessage({ type: 'init', interactionsByContact: this.serializedInteractions });
+
+    this.workers.push(wrapper);
+  }
+}
+
 export class BatchedContactAnalysis {
   private progressTracker: ProgressTracker;
 
@@ -43,6 +229,9 @@ export class BatchedContactAnalysis {
       onError
     });
 
+    let workerPool: WorkerPool | null = null;
+    const metrics = { startTime: performance.now(), stages: new Map<string, number>() };
+
     try {
       const totalContacts = contacts.length;
       const totalBatches = Math.ceil(totalContacts / batchSize);
@@ -56,6 +245,8 @@ export class BatchedContactAnalysis {
 
       // Stage 1: Prepare analysis
       this.progressTracker.updateStageProgress('preparing_analysis', 0, 1, 'Preparing contact analysis...');
+      
+      const prepStart = performance.now();
       
       // Group email interactions by contact for faster lookup
       const interactionsByContact = new Map<string, EmailInteraction[]>();
@@ -79,6 +270,24 @@ export class BatchedContactAnalysis {
         }
       });
 
+      const serializeStart = performance.now();
+      const serializedInteractionsByContact: Record<string, SerializableInteraction[]> = {};
+      interactionsByContact.forEach((interactionList, contactId) => {
+        serializedInteractionsByContact[contactId] = interactionList.map(interaction => ({
+          id: interaction.id,
+          contactId: interaction.contactId,
+          subject: interaction.subject,
+          date: interaction.date.getTime(),
+          direction: interaction.direction,
+          isRead: interaction.isRead,
+          isReplied: interaction.isReplied,
+          threadId: interaction.threadId,
+        }));
+      });
+
+      metrics.stages.set('serialization_ms', performance.now() - serializeStart);
+      metrics.stages.set('prep_ms', performance.now() - prepStart);
+
       this.progressTracker.completeStage('preparing_analysis', `Analysis preparation complete - ${interactionsByContact.size} contacts with interactions`);
 
       // Stage 2: Analyze contacts in batches
@@ -87,91 +296,92 @@ export class BatchedContactAnalysis {
       const analyzedContacts: ContactWithAnalysis[] = [];
       const batches: Array<{ id: string; name: string; email: string }[]> = [];
 
-      // Create batches
       for (let i = 0; i < totalContacts; i += batchSize) {
         batches.push(contacts.slice(i, i + batchSize));
       }
 
       console.log(`Created ${batches.length} batches of size ${batchSize}`);
 
-      // Always show initial progress
       this.progressTracker.updateStageProgress('analyzing_contacts', 0, totalContacts, `Starting analysis of ${totalContacts.toLocaleString()} contacts...`);
 
       let processedContacts = 0;
+      let completedBatches = 0;
+      const jobProgress = new Map<string, number>();
+      const analysisStart = performance.now();
 
-      // Process batches with concurrency control using a worker pool
-      for (let i = 0; i < batches.length; i += maxConcurrentBatches) {
-        const currentBatches = batches.slice(i, i + maxConcurrentBatches);
+      workerPool = new WorkerPool(maxConcurrentBatches, serializedInteractionsByContact);
 
-        const batchPromises = currentBatches.map(async (batch) => {
-          // Build serializable interactions map for worker
-          const serializableMap: Record<string, Array<{ id: string; contactId: string; subject: string; date: string; direction: 'sent' | 'received'; isRead: boolean; isReplied: boolean; threadId?: string }>> = {};
-          for (const contact of batch) {
-            const contactInteractions = interactionsByContact.get(contact.id) || [];
-            serializableMap[contact.id] = contactInteractions.map(ci => ({
-              ...ci,
-              date: ci.date.toISOString(),
-            }));
-          }
+      const batchPromises = batches.map((batch, index) => {
+        const jobId = `batch-${index}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+        const dynamicChunkSize = this.calculateOptimalChunkSize(batch.length);
+        const payload: WorkerJobPayload = {
+          contacts: batch,
+          chunkSize: dynamicChunkSize
+        };
 
-          const worker: Worker = new (AnalysisWorker as unknown as { new(): Worker })();
-          const jobId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        return workerPool!
+          .runJob(jobId, payload, (processed) => {
+            const previous = jobProgress.get(jobId) ?? 0;
+            const delta = Math.max(0, processed - previous);
+            if (delta === 0) {
+              return;
+            }
 
-          const analyzed = await new Promise<ContactWithAnalysis[]>((resolve, reject) => {
-            const onMessage = (ev: MessageEvent) => {
-              const data = ev.data as { jobId: string; type: 'progress' | 'result'; processed?: number; total?: number; analyzedContacts?: ContactWithAnalysis[] };
-              if (data.type === 'progress') {
-                // Aggregate progress across workers
-                const processed = Math.min(totalContacts, (processedContacts + (data.processed || 0)));
-                this.progressTracker.updateStageProgress(
-                  'analyzing_contacts',
-                  processed,
-                  totalContacts,
-                  `Analyzing ${processed.toLocaleString()} / ${totalContacts.toLocaleString()} contacts...`
-                );
-              } else if (data.type === 'result') {
-                worker.removeEventListener('message', onMessage);
-                worker.terminate();
-                resolve(data.analyzedContacts || []);
-              }
-            };
-            worker.addEventListener('message', onMessage);
-            worker.addEventListener('error', err => reject(err));
-            worker.postMessage({ jobId, contacts: batch, interactionsByContact: serializableMap, chunkSize: Math.min(200, Math.max(50, Math.floor(batch.length / 2))) });
+            jobProgress.set(jobId, processed);
+            processedContacts = Math.min(totalContacts, processedContacts + delta);
+
+            this.progressTracker.updateStageProgress(
+              'analyzing_contacts',
+              processedContacts,
+              totalContacts,
+              `Analyzing ${processedContacts.toLocaleString()} / ${totalContacts.toLocaleString()} contacts...`
+            );
+          })
+          .then(result => {
+            const previous = jobProgress.get(jobId) ?? 0;
+            if (previous < batch.length) {
+              const delta = batch.length - previous;
+              processedContacts = Math.min(totalContacts, processedContacts + delta);
+            }
+
+            jobProgress.set(jobId, batch.length);
+            completedBatches += 1;
+
+            this.progressTracker.updateStageProgress(
+              'analyzing_contacts',
+              processedContacts,
+              totalContacts,
+              `Analyzed ${processedContacts.toLocaleString()} / ${totalContacts.toLocaleString()} contacts (${completedBatches}/${batches.length} batches)...`
+            );
+
+            return result;
           });
+      });
 
-          processedContacts += analyzed.length;
-          return analyzed;
-        });
+      const batchResults = await Promise.all(batchPromises);
+      batchResults.forEach(result => {
+        analyzedContacts.push(...result);
+      });
 
-        const batchResults = await Promise.all(batchPromises);
-        
-        // Flatten results and add to main array
-        batchResults.forEach(result => {
-          analyzedContacts.push(...result);
-        });
+      metrics.stages.set('analysis_ms', performance.now() - analysisStart);
 
-        processedContacts = analyzedContacts.length;
-        const processedBatches = Math.min(i + maxConcurrentBatches, batches.length);
-        
-        console.log(`Processed ${processedContacts} contacts (batch ${processedBatches}/${batches.length})`);
-        
-        // Update progress after each batch group completes
-        this.progressTracker.updateStageProgress(
-          'analyzing_contacts',
-          processedContacts,
-          totalContacts,
-          `Analyzed ${processedContacts.toLocaleString()} / ${totalContacts.toLocaleString()} contacts (${processedBatches}/${batches.length} batches)...`
-        );
+      processedContacts = analyzedContacts.length;
 
-        // Brief delay to ensure UI updates are visible (reduced for speed)
-        await new Promise(resolve => setTimeout(resolve, 20));
-      }
+      console.log(`Processed ${processedContacts} contacts (${batches.length} batches, max ${maxConcurrentBatches} concurrent)`);
+
+      this.progressTracker.updateStageProgress(
+        'analyzing_contacts',
+        processedContacts,
+        totalContacts,
+        `Analyzed ${processedContacts.toLocaleString()} / ${totalContacts.toLocaleString()} contacts...`
+      );
 
       this.progressTracker.completeStage('analyzing_contacts', 'Contact analysis complete');
 
       // Stage 3: Finalize results
       this.progressTracker.updateStageProgress('finalizing_results', 0, 1, 'Finalizing results...');
+      
+      const finalizeStart = performance.now();
       
       // Sort contacts by category and response rate for better UX
       analyzedContacts.sort((a, b) => {
@@ -196,6 +406,14 @@ export class BatchedContactAnalysis {
         .map(([category, count]) => `${count} ${category}`)
         .join(', ');
 
+      metrics.stages.set('finalize_ms', performance.now() - finalizeStart);
+      metrics.stages.set('total_ms', performance.now() - metrics.startTime);
+
+      const timingDetails = Array.from(metrics.stages.entries())
+        .map(([stage, ms]) => `${stage}: ${ms.toFixed(0)}ms`)
+        .join(', ');
+      console.log(`Performance metrics - ${timingDetails}`);
+
       this.progressTracker.completeStage('finalizing_results', `Results finalized - ${categorySummary}`);
       this.progressTracker.complete(`Analysis complete: ${analyzedContacts.length.toLocaleString()} contacts processed (${categorySummary})`);
 
@@ -204,6 +422,10 @@ export class BatchedContactAnalysis {
     } catch (error) {
       this.progressTracker.error(error as Error, 'Analysis failed');
       throw error;
+    } finally {
+      if (workerPool) {
+        await workerPool.destroy();
+      }
     }
   }
 
@@ -230,5 +452,13 @@ export class BatchedContactAnalysis {
     if (contactCount < 5000) return 150;
     if (contactCount < 10000) return 200;
     return 300; // For very large datasets (10k+)
+  }
+
+  private calculateOptimalChunkSize(batchSize: number): number {
+    if (batchSize < 100) return 20;
+    if (batchSize < 500) return 50;
+    if (batchSize < 1000) return 100;
+    if (batchSize < 2000) return 150;
+    return 200;
   }
 }

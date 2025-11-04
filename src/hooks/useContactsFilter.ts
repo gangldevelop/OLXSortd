@@ -38,8 +38,12 @@ export function useContactsFilter(allContacts: ContactWithAnalysis[]) {
   }, [allContacts, selectedCategory]);
 
   const visibleContacts = useMemo(() => {
-    return baseContacts.filter((c) => !isEmailSnoozed(c.email) && !(c.tags || []).includes('crossware'));
-  }, [baseContacts, snoozedUntilByEmail]);
+    return baseContacts.filter((c) => 
+      !isEmailSnoozed(c.email) && 
+      !(c.tags || []).includes('crossware') && 
+      !(c.tags || []).includes('reseller')
+    );
+  }, [baseContacts, isEmailSnoozed]);
 
   useEffect(() => {
     setFilteredContacts(visibleContacts);

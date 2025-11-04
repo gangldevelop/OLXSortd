@@ -13,6 +13,7 @@ import { useContactsFilter } from './hooks/useContactsFilter';
 import { useContactAnalysis } from './hooks/useContactAnalysis';
 import type { ContactWithAnalysis, ContactCategory } from './types/contact';
 import { getCategoryLabel } from './utils/contactCategory';
+import { loadResellerDataIntoLocalStorage, extractResellersFromCsv, type ResellerCsvEntry } from './utils/segmentation';
 // email templates handled inside EmailComposer
 // progress handled by useContactAnalysis
 
@@ -20,6 +21,7 @@ import { getCategoryLabel } from './utils/contactCategory';
 
 function App() {
   const [contacts, setContacts] = useState<ContactWithAnalysis[]>([]);
+  const [resellers, setResellers] = useState<ResellerCsvEntry[]>([]);
   // isAnalyzing handled by useContactAnalysis
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<{ displayName: string; mail: string; id: string } | null>(null);
@@ -43,6 +45,26 @@ function App() {
   
   const emailTemplatesRef = useRef<HTMLDivElement>(null);
   const { analyzeContacts, isAnalyzing, progress } = useContactAnalysis(setContacts);
+
+  useEffect(() => {
+    const loadResellerData = async () => {
+      try {
+        const baseUrl = import.meta.env.BASE_URL;
+        const response = await fetch(`${baseUrl}resellerContacts.csv`);
+        const csvText = await response.text();
+        console.log('Fetched CSV response:', response.status, response.statusText);
+        console.log('CSV text length:', csvText.length);
+        console.log('First 500 chars:', csvText.substring(0, 500));
+        loadResellerDataIntoLocalStorage(csvText);
+        const parsed = extractResellersFromCsv(csvText);
+        console.log('Parsed reseller entries:', parsed.length);
+        setResellers(parsed);
+      } catch (error) {
+        console.warn('Failed to load reseller contacts CSV:', error);
+      }
+    };
+    loadResellerData();
+  }, []);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -165,6 +187,7 @@ function App() {
               onDraftEmail={handleDraftEmail}
               onShowContactDetails={handleShowContactDetails}
               onSnooze={handleSnoozeContact}
+              resellerCsv={resellers}
             />
             
             {/* Category Filter Indicator */}

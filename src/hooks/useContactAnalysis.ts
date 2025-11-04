@@ -51,10 +51,23 @@ export function useContactAnalysis(onContactsAnalyzed: (contacts: ContactWithAna
         totalItems: 0,
       });
 
-      const [realContacts, realEmailInteractions] = await Promise.all([
-        graphService.getContactsForAnalysis(analysisOptions),
-        graphService.getEmailInteractionsForAnalysis(emailInteractionLimit),
-      ]);
+      const graphStart = performance.now();
+      const contactsStart = performance.now();
+      const contacts = await graphService.getContactsForAnalysis(analysisOptions);
+      const contactsTime = performance.now() - contactsStart;
+      
+      const emailsStart = performance.now();
+      const emailInteractions = await graphService.getEmailInteractionsForAnalysis(emailInteractionLimit);
+      const emailsTime = performance.now() - emailsStart;
+      
+      const graphTotalTime = performance.now() - graphStart;
+
+      console.log(`Graph API Timing:
+  - Fetch contacts: ${contactsTime.toFixed(0)}ms (${contacts.length} contacts)
+  - Fetch emails: ${emailsTime.toFixed(0)}ms (${emailInteractions.length} interactions)
+  - Total Graph: ${graphTotalTime.toFixed(0)}ms`);
+
+      const [realContacts, realEmailInteractions] = [contacts, emailInteractions];
 
       setProgress({
         stage: 'preparing_analysis',

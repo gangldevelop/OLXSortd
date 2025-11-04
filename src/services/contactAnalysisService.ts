@@ -85,12 +85,17 @@ export class ContactAnalysisService {
     contacts: Array<{ id: string; name: string; email: string }>,
     interactionsByContact: Map<string, EmailInteraction[]>
   ): ContactWithAnalysis[] {
-    return contacts.map(contact => {
-      const contactInteractions = interactionsByContact.get(contact.id) || [];
-      // Ensure interactions are sorted by date ascending once per contact
-      if (contactInteractions.length > 1) {
-        contactInteractions.sort((a, b) => a.date.getTime() - b.date.getTime());
+    // Sort all interactions once, upfront
+    const sortedInteractionsByContact = new Map<string, EmailInteraction[]>();
+    for (const [contactId, interactions] of interactionsByContact) {
+      if (interactions.length > 1) {
+        interactions.sort((a, b) => a.date.getTime() - b.date.getTime());
       }
+      sortedInteractionsByContact.set(contactId, interactions);
+    }
+
+    return contacts.map(contact => {
+      const contactInteractions = sortedInteractionsByContact.get(contact.id) || [];
 
       const analysis = this.analyzer.analyzeContact(contact.id, contactInteractions);
       

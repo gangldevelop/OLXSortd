@@ -210,10 +210,11 @@ export class ContactAnalyzer {
    */
   private calculateResponseRateThreadAware(interactions: EmailInteraction[], sentEmailDates: number[]): number {
     if (sentEmailDates.length === 0) return 0;
+    if (interactions.length === 0) return 0;
 
     const replyWindow = 14 * 24 * 60 * 60 * 1000;
 
-    // Group by threadId (fallback to 'global' when missing)
+    // Group by threadId in single pass
     const threadToTimes: Map<string, { sent: number[]; received: number[] }> = new Map();
     for (const i of interactions) {
       const key = i.threadId || 'global';
@@ -223,21 +224,23 @@ export class ContactAnalyzer {
         threadToTimes.set(key, entry);
       }
       const t = i.date.getTime();
-      if (i.direction === 'sent') entry.sent.push(t); else entry.received.push(t);
+      if (i.direction === 'sent') entry.sent.push(t); 
+      else entry.received.push(t);
     }
 
-    // Ensure times are sorted ascending per thread (should already be, but safe)
-    for (const entry of threadToTimes.values()) {
-      if (entry.sent.length > 1) entry.sent.sort((a, b) => a - b);
-      if (entry.received.length > 1) entry.received.sort((a, b) => a - b);
-    }
+    // Assume interactions are already sorted; skip re-sort for performance
+    // If you need to guarantee sort, uncomment these lines:
+    // for (const entry of threadToTimes.values()) {
+    //   if (entry.sent.length > 1) entry.sent.sort((a, b) => a - b);
+    //   if (entry.received.length > 1) entry.received.sort((a, b) => a - b);
+    // }
 
-    // Helper lower_bound
     const lowerBound = (arr: number[], target: number): number => {
       let lo = 0, hi = arr.length;
       while (lo < hi) {
         const mid = (lo + hi) >>> 1;
-        if (arr[mid] < target) lo = mid + 1; else hi = mid;
+        if (arr[mid] < target) lo = mid + 1; 
+        else hi = mid;
       }
       return lo;
     };
@@ -246,8 +249,9 @@ export class ContactAnalyzer {
 
     // For each thread, count replies to sent emails within window using binary search
     for (const entry of threadToTimes.values()) {
+      if (entry.sent.length === 0 || entry.received.length === 0) continue;
+      
       for (const sentTime of entry.sent) {
-        if (entry.received.length === 0) continue;
         const idx = lowerBound(entry.received, sentTime + 1);
         if (idx < entry.received.length) {
           const firstReplyTime = entry.received[idx];
@@ -277,27 +281,30 @@ export class ContactAnalyzer {
         threadToTimes.set(key, entry);
       }
       const t = i.date.getTime();
-      if (i.direction === 'sent') entry.sent.push(t); else entry.received.push(t);
+      if (i.direction === 'sent') entry.sent.push(t); 
+      else entry.received.push(t);
     }
 
-    // Sort
-    for (const entry of threadToTimes.values()) {
-      if (entry.sent.length > 1) entry.sent.sort((a, b) => a - b);
-      if (entry.received.length > 1) entry.received.sort((a, b) => a - b);
-    }
+    // Skip redundant sorts; interactions already sorted by time
+    // for (const entry of threadToTimes.values()) {
+    //   if (entry.sent.length > 1) entry.sent.sort((a, b) => a - b);
+    //   if (entry.received.length > 1) entry.received.sort((a, b) => a - b);
+    // }
 
     // Lower bound helper
     const lowerBound = (arr: number[], target: number): number => {
       let lo = 0, hi = arr.length;
       while (lo < hi) {
         const mid = (lo + hi) >>> 1;
-        if (arr[mid] < target) lo = mid + 1; else hi = mid;
+        if (arr[mid] < target) lo = mid + 1; 
+        else hi = mid;
       }
       return lo;
     };
 
     for (const entry of threadToTimes.values()) {
       if (entry.sent.length === 0 || entry.received.length === 0) continue;
+      
       for (const sentTime of entry.sent) {
         const idx = lowerBound(entry.received, sentTime + 1);
         if (idx < entry.received.length) {

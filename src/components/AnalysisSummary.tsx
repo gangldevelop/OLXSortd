@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import type { ResellerCsvEntry } from '../utils/segmentation';
 import { ContactSearch } from './ContactSearch';
 import type { ContactWithAnalysis } from '../types/contact';
 import { SNOOZE_DURATIONS } from '../types';
@@ -10,12 +11,14 @@ export function AnalysisSummary({
   onDraftEmail,
   onShowContactDetails,
   onSnooze,
+  resellerCsv,
 }: {
   contacts: ContactWithAnalysis[];
   onCategoryClick: (category: string | null) => void;
   onDraftEmail: (contact: ContactWithAnalysis) => void;
   onShowContactDetails: (contact: ContactWithAnalysis) => void;
   onSnooze: (contact: ContactWithAnalysis, days: number) => void;
+  resellerCsv?: ResellerCsvEntry[];
 }) {
   const [needsAttentionContacts, setNeedsAttentionContacts] = useState<ContactWithAnalysis[]>([]);
   const summary = {
@@ -32,6 +35,7 @@ export function AnalysisSummary({
     
     return contacts
       .filter((contact) => !(contact.tags || []).includes('crossware'))
+      .filter((contact) => !(contact.tags || []).includes('reseller'))
       .filter((contact) => {
         if (!contact.lastContactDate || contact.emailCount === 0) return false;
         
@@ -189,6 +193,69 @@ export function AnalysisSummary({
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* Resellers (CSV) Section */}
+      {!!(resellerCsv && resellerCsv.length) && (
+        <div className="bg-white rounded border p-2">
+          <h3 className="text-sm font-semibold text-gray-900 mb-2">Resellers ({resellerCsv.length})</h3>
+          <div className="max-h-48 overflow-y-auto space-y-1.5">
+            {resellerCsv.map((r) => (
+              <div key={r.id} className="flex items-start justify-between p-1.5 bg-gray-50 rounded">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="text-xs font-medium text-gray-900 truncate">{r.reseller}</p>
+                    <span className="px-1.5 py-0.5 text-[10px] font-medium rounded border bg-indigo-50 text-indigo-700 border-indigo-100">Reseller</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-[11px] text-gray-600">
+                    <span className="truncate" title={r.contact}>{r.contact}</span>
+                    {r.mobile && <span>{r.mobile}</span>}
+                    {r.location && <span>{r.location}</span>}
+                    {r.revenue && <span>€ {r.revenue}</span>}
+                  </div>
+                </div>
+                {r.contact && (
+                  <button
+                    onClick={() => {
+                      const id = `reseller:${r.id}`;
+                      const virtualContact: ContactWithAnalysis = {
+                        id,
+                        name: r.reseller || r.representative || r.contact,
+                        email: r.contact,
+                        category: 'inactive',
+                        analysis: {
+                          contactId: id,
+                          category: 'inactive',
+                          score: 0,
+                          metrics: {
+                            totalEmails: 0,
+                            sentEmails: 0,
+                            receivedEmails: 0,
+                            responseRate: 0,
+                            daysSinceLastContact: 9999,
+                            averageResponseTime: 0,
+                            conversationCount: 0,
+                          },
+                          insights: [],
+                          lastAnalyzed: new Date(),
+                        },
+                        lastContactDate: null,
+                        emailCount: 0,
+                        responseRate: 0,
+                        isActive: true,
+                        tags: ['reseller'],
+                      };
+                      onDraftEmail(virtualContact);
+                    }}
+                    className="text-xs text-primary-600 hover:text-primary-700 font-medium px-2 py-1 hover:bg-primary-50 rounded transition-colors ml-2"
+                  >
+                    Draft
+                  </button>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       )}

@@ -147,12 +147,14 @@ class MicrosoftGraphFacade {
     since.setDate(since.getDate() - HISTORY_DAYS);
     const sinceIso = since.toISOString();
     const usePaged = limit > 1000;
-    const sentEmails = usePaged
-      ? await this.contacts.getEmailMessagesSince('sentitems', sinceIso, GRAPH_MAX_PAGES, GRAPH_PAGE_SIZE)
-      : await this.contacts.getEmailMessagesFromPeriods('sentitems', [0, 30, 90, 180, 365]);
-    const receivedEmails = usePaged
-      ? await this.contacts.getEmailMessagesSince('inbox', sinceIso, GRAPH_MAX_PAGES, GRAPH_PAGE_SIZE)
-      : await this.contacts.getEmailMessagesFromPeriods('inbox', [0, 30, 90, 180, 365]);
+    const [sentEmails, receivedEmails] = await Promise.all([
+      usePaged
+        ? this.contacts.getEmailMessagesSince('sentitems', sinceIso, GRAPH_MAX_PAGES, GRAPH_PAGE_SIZE)
+        : this.contacts.getEmailMessagesFromPeriods('sentitems', [0, 30, 90, 180, 365]),
+      usePaged
+        ? this.contacts.getEmailMessagesSince('inbox', sinceIso, GRAPH_MAX_PAGES, GRAPH_PAGE_SIZE)
+        : this.contacts.getEmailMessagesFromPeriods('inbox', [0, 30, 90, 180, 365])
+    ]);
 
     const interactions: Array<{
       id: string; contactId: string; subject: string; date: Date; direction: 'sent' | 'received'; isRead: boolean; isReplied: boolean; threadId?: string;
@@ -217,14 +219,20 @@ class MicrosoftGraphFacade {
       const since = new Date();
       since.setDate(since.getDate() - HISTORY_DAYS);
       const sinceIso = since.toISOString();
-      sentEmails = await this.contacts.getEmailMessagesSince('sentitems', sinceIso, GRAPH_MAX_PAGES, GRAPH_PAGE_SIZE);
-      receivedEmails = await this.contacts.getEmailMessagesSince('inbox', sinceIso, GRAPH_MAX_PAGES, GRAPH_PAGE_SIZE);
+      [sentEmails, receivedEmails] = await Promise.all([
+        this.contacts.getEmailMessagesSince('sentitems', sinceIso, GRAPH_MAX_PAGES, GRAPH_PAGE_SIZE),
+        this.contacts.getEmailMessagesSince('inbox', sinceIso, GRAPH_MAX_PAGES, GRAPH_PAGE_SIZE)
+      ]);
     } else if (quickMode) {
-      sentEmails = await this.mail.getEmailMessages('sentitems', 1000);
-      receivedEmails = await this.mail.getEmailMessages('inbox', 1000);
+      [sentEmails, receivedEmails] = await Promise.all([
+        this.mail.getEmailMessages('sentitems', 1000),
+        this.mail.getEmailMessages('inbox', 1000)
+      ]);
     } else {
-      sentEmails = await this.contacts.getEmailMessagesFromPeriods('sentitems', [0, 30, 90, 180, 365]);
-      receivedEmails = await this.contacts.getEmailMessagesFromPeriods('inbox', [0, 30, 90, 180, 365]);
+      [sentEmails, receivedEmails] = await Promise.all([
+        this.contacts.getEmailMessagesFromPeriods('sentitems', [0, 30, 90, 180, 365]),
+        this.contacts.getEmailMessagesFromPeriods('inbox', [0, 30, 90, 180, 365])
+      ]);
     }
 
     const emailContacts = new Map<string, { id: string; name: string; email: string }>();
