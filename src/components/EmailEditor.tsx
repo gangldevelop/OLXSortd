@@ -8,12 +8,28 @@ interface EmailEditorProps {
   contactName: string;
   contactEmail: string;
   senderName: string;
+  initialSubject?: string;
+  initialBodyText?: string;
+  initialHtmlBody?: string;
+  enableTemplateAutoUpdate?: boolean;
   onSave: (draft: { subject: string; body: string; htmlBody: string }) => void;
   onSend: (email: { subject: string; body: string; htmlBody: string; to: string }) => void;
   onCancel: () => void;
 }
 
-export function EmailEditor({ template, contactName, contactEmail, senderName, onSave, onSend, onCancel }: EmailEditorProps) {
+export function EmailEditor({
+  template,
+  contactName,
+  contactEmail,
+  senderName,
+  initialSubject,
+  initialBodyText,
+  initialHtmlBody,
+  enableTemplateAutoUpdate = true,
+  onSave,
+  onSend,
+  onCancel,
+}: EmailEditorProps) {
   const [variables, setVariables] = useState({
     name: contactName,
     senderName: senderName,
@@ -21,9 +37,9 @@ export function EmailEditor({ template, contactName, contactEmail, senderName, o
     industry: 'Your Industry'
   });
 
-  const [subject, setSubject] = useState(template.subject);
-  const [body, setBody] = useState(template.body);
-  const [htmlBody, setHtmlBody] = useState(template.body);
+  const [subject, setSubject] = useState(initialSubject ?? template.subject);
+  const [body, setBody] = useState(initialBodyText ?? template.body);
+  const [htmlBody, setHtmlBody] = useState(initialHtmlBody ?? template.body);
   const quillRef = useRef<ReactQuill>(null);
 
   // Quill editor configuration
@@ -43,13 +59,19 @@ export function EmailEditor({ template, contactName, contactEmail, senderName, o
     'color', 'background', 'list', 'bullet', 'link', 'blockquote'
   ];
 
-  // Update email content when variables change
+  // Update email content when variables change (template-based drafts only)
   React.useEffect(() => {
-    const processed = processTemplate({ ...template, subject: template.subject, body: template.body }, variables);
+    if (!enableTemplateAutoUpdate) {
+      return;
+    }
+    const processed = processTemplate(
+      { ...template, subject: template.subject, body: template.body },
+      variables
+    );
     setSubject(processed.subject);
     setBody(processed.body);
     setHtmlBody(processed.body);
-  }, [variables, template]);
+  }, [variables, template, enableTemplateAutoUpdate]);
 
   const handleVariableChange = (key: string, value: string) => {
     setVariables(prev => ({ ...prev, [key]: value }));
