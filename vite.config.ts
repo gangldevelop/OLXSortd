@@ -24,5 +24,12 @@ export default defineConfig({
   server: {
     port: 3000,
     // https: true, // Temporarily disabled due to Windows update issues
+    proxy: {
+      '/api/llm': {
+        target: 'http://127.0.0.1:8080',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/llm/, ''),
+      },
+    },
   },
 })

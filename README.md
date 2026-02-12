@@ -54,6 +54,18 @@ Each contact category has specialized email templates:
 - **In Touch Contacts**: Templates for following up on previous conversations and maintaining momentum
 - **Inactive Contacts**: Templates for reconnecting with contacts that have gone quiet, restarting old leads
 
+### 🤖 AI-Powered Email Generation
+- **One-Click AI Drafts**: Generate professional email replies based on previous conversations
+- **Context-Aware**: Uses the most recent email with each contact as context for relevant replies
+- **Local or Cloud**: Works with local LLM (Phi-3.5 via llama.cpp) or managed APIs (OpenAI, Azure)
+- **Editable Output**: AI drafts are fully editable before sending
+- **German Language Support**: Optimized for German business communication
+- **Fast Generation**: 5-10 seconds per draft (after initial model loading)
+
+For setup instructions, see:
+- **Windows Server**: [DEV_SERVER_SETUP.md](./docs/DEV_SERVER_SETUP.md)
+- **Mac/Linux**: [LLM_QUICK_START.md](./docs/LLM_QUICK_START.md)
+
 ### 📊 Analytics Dashboard
 - **Contact Overview**: Visual summary of contact categories and metrics
 - **Needs Attention**: Intelligently prioritized list of contacts requiring follow-up and re-engagement
@@ -389,6 +401,7 @@ npm run build
 ## 🗺️ Roadmap
 
 ### Upcoming Features
+- [x] **AI-Powered Email Generation**: LLM-based email draft generation (v0.0.5)
 - [ ] **AI-Powered Insights**: Machine learning for contact scoring
 - [ ] **Email Scheduling**: Schedule emails for optimal send times
 - [ ] **A/B Testing**: Test different email templates and approaches

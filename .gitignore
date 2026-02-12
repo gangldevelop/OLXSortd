@@ -24,3 +24,8 @@ dist-ssr
 *.sw?
 
 .env
+
+# LLM models (large binary files)
+*.gguf
+models/
+llm-server/models/*.gguf

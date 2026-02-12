@@ -6,8 +6,9 @@ import { ContactsService } from './graph/contactsService';
 
 const DEBUG_GRAPH = import.meta.env.VITE_DEBUG_GRAPH === 'true';
 const HISTORY_DAYS = Number(import.meta.env.VITE_HISTORY_DAYS ?? 730); // default 2 years
-const GRAPH_PAGE_SIZE = Number(import.meta.env.VITE_GRAPH_PAGE_SIZE ?? 100);
-const GRAPH_MAX_PAGES = Number(import.meta.env.VITE_GRAPH_MAX_PAGES ?? 40);
+const GRAPH_PAGE_SIZE = Number(import.meta.env.VITE_GRAPH_PAGE_SIZE ?? 200); // Optimized: fewer API calls
+const GRAPH_MAX_PAGES = Number(import.meta.env.VITE_GRAPH_MAX_PAGES ?? 20); // Optimized: 4000 emails max
+const CACHE_TTL_MINUTES = 30; // Cache emails for 30 minutes
 
 class MicrosoftGraphFacade {
   private readonly msal: MsalClient;
@@ -130,7 +131,7 @@ class MicrosoftGraphFacade {
     return baseSubject.replace(/[^a-z0-9]/g, '').substring(0, 20) || 'thread-' + Math.random().toString(36).substr(2, 9);
   }
 
-  async getEmailInteractionsForAnalysis(limit: number = 200): Promise<Array<{
+  async getEmailInteractionsForAnalysis(limit: number = 200, useCache: boolean = true): Promise<Array<{
     id: string;
     contactId: string;
     subject: string;
@@ -140,6 +141,24 @@ class MicrosoftGraphFacade {
     isReplied: boolean;
     threadId?: string;
   }>> {
+    // Try cache first
+    if (useCache) {
+      try {
+        const cacheKey = `olx_email_cache_${limit}`;
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) {
+          const { data, timestamp } = JSON.parse(cached);
+          const age = Date.now() - timestamp;
+          if (age < CACHE_TTL_MINUTES * 60 * 1000) {
+            console.log(`Using cached emails (${(age / 1000 / 60).toFixed(1)} minutes old)`);
+            return data.map((item: any) => ({ ...item, date: new Date(item.date) }));
+          }
+        }
+      } catch (error) {
+        console.warn('Cache read failed:', error);
+      }
+    }
+
     const currentUser = await this.getCurrentUser();
     const userEmail = (currentUser.mail || (currentUser as any).userPrincipalName || '').toLowerCase();
     // For comprehensive runs, fetch paginated messages since two years ago to ensure coverage
@@ -194,8 +213,24 @@ class MicrosoftGraphFacade {
       }
     });
 
-    if (DEBUG_GRAPH) console.log(`Found ${interactions.length} email interactions for analysis`);
-    return interactions;
+    // Sort and cache the results
+    const sortedInteractions = interactions.sort((a, b) => a.date.getTime() - b.date.getTime());
+    
+    if (useCache) {
+      try {
+        const cacheKey = `olx_email_cache_${limit}`;
+        localStorage.setItem(cacheKey, JSON.stringify({
+          data: sortedInteractions,
+          timestamp: Date.now()
+        }));
+        console.log(`Cached ${sortedInteractions.length} email interactions`);
+      } catch (error) {
+        console.warn('Cache write failed (storage full?):', error);
+      }
+    }
+
+    if (DEBUG_GRAPH) console.log(`Found ${sortedInteractions.length} email interactions for analysis`);
+    return sortedInteractions;
   }
 
   async getContactsForAnalysis(options: { maxEmails?: number; useAllEmails?: boolean; quickMode?: boolean } = {}): Promise<Array<{ id: string; name: string; email: string }>> {

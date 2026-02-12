@@ -13,8 +13,11 @@ OLXSortd now includes AI-powered email draft generation using local LLMs.
 
 ### Quick Start Guides
 
-1. **[LLM Quick Start](./LLM_QUICK_START.md)** - Get running in 5 minutes (automated script)
-2. **[Local LLM Setup](./LOCAL_LLM_SETUP.md)** - Detailed manual setup guide with troubleshooting
+Choose the guide for your platform:
+
+1. **[Dev Server Setup](./DEV_SERVER_SETUP.md)** - Windows Server setup with full specs (Intel Xeon, 256GB RAM)
+2. **[LLM Quick Start](./LLM_QUICK_START.md)** - Mac/Linux automated setup (5 minutes)
+3. **[Local LLM Setup](./LOCAL_LLM_SETUP.md)** - Detailed manual setup guide with troubleshooting
 
 ### Architecture
 
@@ -49,15 +52,16 @@ VITE_LLM_API_KEY=                     # Optional, for managed APIs
 
 ### Deployment Options
 
+#### Windows Server (Production)
+- Intel Xeon E5-2560 (16 cores, 32 threads)
+- 256GB RAM, Windows Server (AMD64)
+- llama.cpp with Phi-3.5 GGUF via Docker
+- See: [DEV_SERVER_SETUP.md](./DEV_SERVER_SETUP.md)
+
 #### Local Development (Mac/Linux)
 - llama.cpp with Phi-3.5 GGUF via Docker
 - CPU-only inference (no GPU required)
 - See: [LLM_QUICK_START.md](./LLM_QUICK_START.md)
-
-#### Work Server Deployment
-1. Same Docker setup as local
-2. Change `VITE_LLM_BASE_URL` to point to server IP
-3. No code changes required
 
 #### Production (Managed API)
 ```bash
@@ -86,9 +90,10 @@ VITE_LLM_API_KEY=sk-...
 **New files:**
 - `src/services/llmClient.ts` - LLM API client
 - `src/utils/llmPrompt.ts` - Prompt builder with HTML→text conversion
-- `scripts/setup-local-llm.sh` - Automated setup script
-- `docs/LOCAL_LLM_SETUP.md` - Detailed guide
-- `docs/LLM_QUICK_START.md` - Quick reference
+- `scripts/setup-local-llm.sh` - Automated setup script (Mac/Linux)
+- `docs/DEV_SERVER_SETUP.md` - Windows Server setup guide
+- `docs/LOCAL_LLM_SETUP.md` - Detailed manual setup guide
+- `docs/LLM_QUICK_START.md` - Quick reference (Mac/Linux)
 
 **Modified files:**
 - `src/components/EmailComposer.tsx` - Added "Generate with AI" button & logic
@@ -115,9 +120,12 @@ VITE_LLM_API_KEY=sk-...
 - Subsequent: 5-15s
 - RAM: ~3-4GB
 
-**Work server (300GB RAM, no GPU):**
-- Similar or faster with more CPU cores
-- Can run much larger models if needed
+**Dev server (256GB RAM, 16 cores, no GPU):**
+- First request: 30-60s (model loading + generation)
+- Subsequent: 5-10s
+- RAM: ~52GB (48GB KV cache + 2.4GB model)
+- Parallel slots: 4 simultaneous users
+- See: [DEV_SERVER_SETUP.md](./DEV_SERVER_SETUP.md)
 
 ### Troubleshooting
 

@@ -43,7 +43,7 @@ export class ContactsService {
     folder: 'inbox' | 'sentitems',
     sinceIso: string,
     maxPages: number = 20,
-    pageSize: number = 100
+    pageSize: number = 200 // Increased from 100 for fewer API calls
   ): Promise<EmailMessage[]> {
     const startTime = performance.now();
     const emails: EmailMessage[] = [];
@@ -62,11 +62,12 @@ export class ContactsService {
       return emails;
     }
 
-    // Fetch remaining pages sequentially with throttling to avoid 429 errors
+    // Fetch remaining pages sequentially with minimal throttling
+    // 10ms delay is safe for Graph API (max ~100 req/sec per mailbox)
     let page = 1;
 
     while (nextLink && page < maxPages) {
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise(resolve => setTimeout(resolve, 10)); // Reduced from 50ms
       
       const resp: any = await this.graph.request<any>(nextLink);
       const pageEmails: EmailMessage[] = resp.value || [];

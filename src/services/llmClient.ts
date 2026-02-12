@@ -19,7 +19,7 @@ export interface LlmClient {
 
 const PROVIDER = import.meta.env.VITE_LLM_PROVIDER ?? 'openai-compatible';
 const BASE_URL = import.meta.env.VITE_LLM_BASE_URL ?? '';
-const MODEL = import.meta.env.VITE_LLM_MODEL ?? 'phi-3.5-mini';
+const MODEL = import.meta.env.VITE_LLM_MODEL ?? 'phi-3.5-mini-instruct-q4.gguf';
 const API_KEY = import.meta.env.VITE_LLM_API_KEY ?? '';
 
 async function callOpenAiCompatible(
@@ -85,6 +85,8 @@ class DefaultLlmClient implements LlmClient {
               { role: 'user', content: user },
             ],
             temperature: 0.3,
+            max_tokens: 400,
+            stop: ["<|end|>", "<|endoftext|>", "\n\n\n"],
             stream: false,
           }
         : {
@@ -94,6 +96,8 @@ class DefaultLlmClient implements LlmClient {
               { role: 'user', content: user },
             ],
             temperature: 0.3,
+            max_tokens: 400,
+            stop: ["<|end|>", "<|endoftext|>", "\n\n\n"],
             stream: false,
           };
 

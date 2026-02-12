@@ -215,8 +215,8 @@ export class BatchedContactAnalysis {
     options: BatchedAnalysisOptions = {}
   ): Promise<ContactWithAnalysis[]> {
     const {
-      batchSize = 100,
-      maxConcurrentBatches = 3,
+      batchSize = 150,      // Increased from 100
+      maxConcurrentBatches = 6,  // Increased from 3
       onProgress,
       onComplete,
       onError
