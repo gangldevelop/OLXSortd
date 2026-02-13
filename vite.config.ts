@@ -13,13 +13,6 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    rollupOptions: {
-      input: {
-        main: resolve(__dirname, 'index.html'),
-        outlook: resolve(__dirname, 'outlook-addin.html'),
-        gmail: resolve(__dirname, 'gmail-addon.html'),
-      },
-    },
   },
   server: {
     port: 3000,

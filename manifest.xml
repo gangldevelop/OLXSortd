@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0" xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="MailApp">
-  <Id>12345678-1234-1234-1234-123456789012</Id>
+  <Id>a7b3c9d2-5f8e-4a1b-9c3d-7e6f8a9b2c4d</Id>
   <Version>0.0.0.1</Version>
   <ProviderName>OLXOutreach</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
@@ -23,7 +23,7 @@
   <FormSettings>
     <Form xsi:type="ItemRead">
       <DesktopSettings>
-        <SourceLocation DefaultValue="https://portsmouth-hereby-fibre-gotta.trycloudflare.com/outlook-addin.html"/>
+        <SourceLocation DefaultValue="https://portsmouth-hereby-fibre-gotta.trycloudflare.com/"/>
         <RequestedHeight>450</RequestedHeight>
       </DesktopSettings>
     </Form>
@@ -74,8 +74,8 @@
         <bt:Image id="icon-80" DefaultValue="https://portsmouth-hereby-fibre-gotta.trycloudflare.com/vite.svg" />
       </bt:Images>
       <bt:Urls>
-        <bt:Url id="functionFile" DefaultValue="https://portsmouth-hereby-fibre-gotta.trycloudflare.com/outlook-addin.html" />
-        <bt:Url id="messageReadTaskPaneUrl" DefaultValue="https://portsmouth-hereby-fibre-gotta.trycloudflare.com/outlook-addin.html" />
+        <bt:Url id="functionFile" DefaultValue="https://portsmouth-hereby-fibre-gotta.trycloudflare.com/" />
+        <bt:Url id="messageReadTaskPaneUrl" DefaultValue="https://portsmouth-hereby-fibre-gotta.trycloudflare.com/" />
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="groupLabel" DefaultValue="OLXOutreach" />
