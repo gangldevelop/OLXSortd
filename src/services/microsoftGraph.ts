@@ -6,8 +6,8 @@ import { ContactsService } from './graph/contactsService';
 
 const DEBUG_GRAPH = import.meta.env.VITE_DEBUG_GRAPH === 'true';
 const HISTORY_DAYS = Number(import.meta.env.VITE_HISTORY_DAYS ?? 730); // default 2 years
-const GRAPH_PAGE_SIZE = Number(import.meta.env.VITE_GRAPH_PAGE_SIZE ?? 200); // Optimized: fewer API calls
-const GRAPH_MAX_PAGES = Number(import.meta.env.VITE_GRAPH_MAX_PAGES ?? 20); // Optimized: 4000 emails max
+const GRAPH_PAGE_SIZE = Number(import.meta.env.VITE_GRAPH_PAGE_SIZE ?? 1000); // Optimized: 1000 per page = fewer round trips
+const GRAPH_MAX_PAGES = Number(import.meta.env.VITE_GRAPH_MAX_PAGES ?? 5); // Optimized: 5000 emails max with fewer API calls
 const CACHE_TTL_MINUTES = 30; // Cache emails for 30 minutes
 
 class MicrosoftGraphFacade {

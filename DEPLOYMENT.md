@@ -1,153 +1,151 @@
-# GitHub Pages Deployment Guide
+# Deployment Guide
 
-This guide will help you deploy OLXSortd to GitHub Pages for free hosting.
+## Environment Files Setup
 
-## 🚀 Quick Deployment
+### ⚠️ NEVER commit these files to Git:
+- `.env`
+- `.env.production`
+- `.env.local`
+- `.env.production.local`
 
-### Step 1: Enable GitHub Pages
+These files are in `.gitignore` and contain secrets!
 
-1. Go to your GitHub repository
-2. Click **Settings** tab
-3. Scroll down to **Pages** section
-4. Under **Source**, select **GitHub Actions**
-5. Save the settings
+### ✅ Safe to commit:
+- `.env.example` - Template for development
+- `.env.production.example` - Template for production
 
-### Step 2: Push Your Code
+## Local Development Setup
 
-The deployment will happen automatically when you push to the `master` branch:
-
+1. Copy the example file:
 ```bash
-git add .
-git commit -m "Deploy to GitHub Pages"
-git push origin master
+cp .env.example .env
 ```
 
-### Step 3: Wait for Deployment
+2. Fill in your actual values:
+   - Azure App Registration details
+   - LLM configuration
 
-1. Go to **Actions** tab in your GitHub repository
-2. You'll see the "Deploy to GitHub Pages" workflow running
-3. Wait for it to complete (usually 2-3 minutes)
-4. Once complete, your site will be available at:
-   ```
-   https://yourusername.github.io/OLXSortd/
-   ```
-
-## 🔧 Manual Deployment (Alternative)
-
-If you prefer manual deployment:
-
+3. Run dev server:
 ```bash
-# Install dependencies
-npm install
-
-# Build for GitHub Pages
-npm run build:github
-
-# Deploy to GitHub Pages
-npm run deploy
+npm run dev
 ```
 
-## 📝 Environment Variables for Production
+## GitHub Pages Deployment
 
-For production deployment, you'll need to update your environment variables:
+**Important**: GitHub Pages is a static host. The Vite proxy won't work in production!
 
-1. **Azure Configuration**: Update your Azure app registration with the production URL:
-   - Redirect URI: `https://yourusername.github.io/OLXSortd/auth/callback`
+### Option 1: Deploy with Public LLM URL
 
-2. **Environment Variables**: Update your `.env` file:
-   ```env
-   VITE_AZURE_REDIRECT_URI=https://yourusername.github.io/OLXSortd/auth/callback
-   ```
+1. Set up GitHub Secrets:
+   - Go to: Repository Settings → Secrets → Actions
+   - Add these secrets:
+     - `VITE_AZURE_CLIENT_ID`
+     - `VITE_AZURE_CLIENT_SECRET`
+     - `VITE_AZURE_REDIRECT_URI` (e.g., `https://yourusername.github.io/OLXOutreach/auth/callback`)
+     - `VITE_LLM_BASE_URL` (your LLM tunnel or server URL)
 
-## 🔍 Troubleshooting
+2. Use GitHub Actions to build and deploy:
+```yaml
+# .github/workflows/deploy.yml
+name: Deploy to GitHub Pages
 
-### Common Issues:
+on:
+  push:
+    branches: [ main ]
 
-1. **404 Errors**
-   - Make sure the base path in `vite.config.ts` matches your repository name
-   - Check that GitHub Pages is enabled in repository settings
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build
+        env:
+          VITE_AZURE_CLIENT_ID: ${{ secrets.VITE_AZURE_CLIENT_ID }}
+          VITE_AZURE_CLIENT_SECRET: ${{ secrets.VITE_AZURE_CLIENT_SECRET }}
+          VITE_AZURE_REDIRECT_URI: ${{ secrets.VITE_AZURE_REDIRECT_URI }}
+          VITE_LLM_BASE_URL: ${{ secrets.VITE_LLM_BASE_URL }}
+        run: npm run build
+      
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+```
 
-2. **Authentication Issues**
-   - Update Azure app registration redirect URI to production URL
-   - Verify environment variables are correct
+### Option 2: Deploy Without LLM Feature
 
-3. **Build Failures**
-   - Check GitHub Actions logs for specific error messages
-   - Ensure all dependencies are properly installed
+If you don't want to maintain a public LLM server:
 
-4. **Assets Not Loading**
-   - Verify the `base` path in Vite config is correct
-   - Check that all static assets are in the `dist` folder
+1. Disable AI features in the UI
+2. Only use manual email templates
+3. Build and deploy without LLM configuration
 
-### Debugging Steps:
+## Cloudflare Tunnel Deployment (Current)
 
-1. **Check Build Locally**:
-   ```bash
-   npm run build:github
-   npm run preview
-   ```
+**Pros**: 
+- Works great for testing
+- Easy to set up
+- LLM stays local
 
-2. **Verify GitHub Actions**:
-   - Go to Actions tab
-   - Check the latest workflow run
-   - Look for any error messages
+**Cons**: 
+- URLs change each time (unless using named tunnel)
+- 100-second timeout (can be extended)
+- Not suitable for production
 
-3. **Test Production Build**:
-   ```bash
-   npm run build:github
-   # Serve the dist folder locally to test
-   ```
+**Current Setup**:
+- App: `https://portsmouth-hereby-fibre-gotta.trycloudflare.com`
+- LLM: `https://excellence-incoming-ladies-army.trycloudflare.com`
 
-## 🌐 Custom Domain (Optional)
+## Production Deployment Options
 
-To use a custom domain:
+### 1. Azure Static Web Apps (Recommended)
+- ✅ Free tier available
+- ✅ Built-in CI/CD
+- ✅ Custom domains
+- ✅ Environment variables via portal
+- ✅ Can deploy backend function for LLM proxy
 
-1. Add a `CNAME` file to your repository root:
-   ```
-   yourdomain.com
-   ```
+### 2. Vercel/Netlify
+- ✅ Easy deployment
+- ✅ Environment variables
+- ✅ Custom domains
+- ⚠️ Need separate LLM hosting
 
-2. Update the GitHub Actions workflow to include the CNAME:
-   ```yaml
-   with:
-     github_token: ${{ secrets.GITHUB_TOKEN }}
-     publish_dir: ./dist
-     cname: yourdomain.com
-   ```
+### 3. Self-Hosted
+- ✅ Full control
+- ✅ LLM on same server
+- ⚠️ Need to manage infrastructure
 
-3. Configure DNS settings with your domain provider
+## Quick Commands
 
-## 📊 Deployment Status
+```bash
+# Development
+npm run dev
 
-You can check deployment status by:
-- Going to the **Actions** tab in your repository
-- Looking for the "Deploy to GitHub Pages" workflow
-- Checking the **Pages** section in repository settings
+# Production build
+npm run build
+npm run preview
 
-## 🔄 Automatic Updates
+# Deploy to GitHub Pages (manual)
+npm run build
+# Then push dist folder to gh-pages branch
+```
 
-Every time you push to the `master` branch:
-1. GitHub Actions automatically builds the project
-2. Deploys the new version to GitHub Pages
-3. Your live site updates within minutes
+## Security Checklist
 
-## 📱 Testing Your Deployment
-
-After deployment, test these features:
-- [ ] Authentication with Microsoft
-- [ ] Contact analysis functionality
-- [ ] Email template selection
-- [ ] Search and filtering
-- [ ] Email composition and sending
-
-## 🆘 Getting Help
-
-If you encounter issues:
-1. Check the GitHub Actions logs
-2. Verify your environment variables
-3. Test locally with `npm run build:github`
-4. Check the browser console for errors
-
----
-
-**Your OLXSortd prototype is now live on GitHub Pages! 🎉**
+- [ ] Never commit `.env` or `.env.production`
+- [ ] Use GitHub Secrets for CI/CD
+- [ ] Rotate Azure client secrets regularly
+- [ ] Use HTTPS for all production URLs
+- [ ] Review Azure App permissions
+- [ ] Keep LLM server access restricted

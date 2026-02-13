@@ -24,6 +24,9 @@ dist-ssr
 *.sw?
 
 .env
+.env.local
+.env.production
+.env.production.local
 
 # LLM models (large binary files)
 *.gguf

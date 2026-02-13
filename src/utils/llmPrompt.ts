@@ -79,20 +79,35 @@ export function parseDraftResponse(raw: string, fallbackSubject?: string): Parse
   let subject = '';
   let bodyText = cleaned;
 
-  const subjectMatch = cleaned.match(/BETREFF:\s*(.+?)(?:\s*---|\n)/);
+  // Case-insensitive match for BETREFF: or Betreff:
+  const subjectMatch = cleaned.match(/betreff:\s*(.+?)(?:\s*---|\n)/i);
 
   if (subjectMatch) {
     subject = subjectMatch[1].trim();
-    const dashIndex = cleaned.indexOf('---', cleaned.indexOf('BETREFF:'));
+    // Find the position after the subject line
+    const subjectLineEnd = subjectMatch.index! + subjectMatch[0].length;
+    
+    // Look for separator (---) after subject
+    const remainingText = cleaned.substring(subjectLineEnd);
+    const dashIndex = remainingText.indexOf('---');
+    
     if (dashIndex !== -1) {
-      bodyText = cleaned.substring(dashIndex).replace(/^-+\s*/, '').trim();
+      bodyText = remainingText.substring(dashIndex).replace(/^-+\s*/, '').trim();
     } else {
-      bodyText = cleaned.substring(cleaned.indexOf('\n') + 1).trim();
+      // No separator, take everything after the subject line
+      bodyText = remainingText.trim();
     }
   } else {
     subject = fallbackSubject || '';
   }
 
+  // Remove any remaining "Betreff:" lines from body (case-insensitive)
+  bodyText = bodyText
+    .replace(/^betreff:\s*.+$/gmi, '')
+    .replace(/betreff:\s*.+$/gmi, '')
+    .trim();
+
+  // Remove subject if it appears at the start of body
   if (subject && bodyText.startsWith(subject)) {
     bodyText = bodyText.substring(subject.length).trim();
   }
@@ -134,19 +149,27 @@ function structureBody(text: string): string {
 }
 
 /**
- * Determines if this is an outreach scenario based on time since last contact.
+ * Determines email mode based on time since last contact AND email content.
+ *
+ * Three modes:
+ * - Reply: recent contact, respond to email content
+ * - Hybrid: old contact but has email content, reply + acknowledge time gap
+ * - Outreach: old contact, no/minimal email, proactive reconnection
  */
-function determineEmailContext(params: BuildDraftPromptParams): {
+function determineEmailContext(params: BuildDraftPromptParams, emailText: string): {
   isOutreach: boolean;
+  isHybrid: boolean;
   contextNote: string;
 } {
   const days = params.daysSinceLastContact ?? 0;
   const category = params.contactCategory;
+  const hasSubstantialEmail = emailText.length > 100;
 
-  // Outreach scenarios: inactive category OR long time since contact
-  if (category === 'inactive' || days >= 180) {
+  // Long gap but substantial email content = hybrid mode
+  if (hasSubstantialEmail && (category === 'inactive' || days >= 180)) {
     return {
-      isOutreach: true,
+      isOutreach: false,
+      isHybrid: true,
       contextNote: days >= 365
         ? `ueber ein Jahr (${Math.floor(days / 30)} Monate)`
         : days >= 180
@@ -155,34 +178,48 @@ function determineEmailContext(params: BuildDraftPromptParams): {
     };
   }
 
-  // Moderate gap: acknowledge but less formal
-  if (days >= 90 && days < 180) {
+  // No/minimal email content + long gap = pure outreach
+  if (!hasSubstantialEmail && (category === 'inactive' || days >= 180)) {
     return {
       isOutreach: true,
+      isHybrid: false,
+      contextNote: days >= 365
+        ? `ueber ein Jahr (${Math.floor(days / 30)} Monate)`
+        : days >= 180
+        ? `mehrere Monate (${Math.floor(days / 30)} Monate)`
+        : 'laengerer Zeit',
+    };
+  }
+
+  // Moderate gap
+  if (days >= 90 && days < 180) {
+    return {
+      isOutreach: !hasSubstantialEmail,
+      isHybrid: hasSubstantialEmail,
       contextNote: 'einiger Zeit',
     };
   }
 
-  // Recent contact: normal reply tone
+  // Recent contact: normal reply
   return {
     isOutreach: false,
+    isHybrid: false,
     contextNote: '',
   };
 }
 
-/**
- * Single-pass draft prompt. Parse output with parseDraftResponse().
- *
- * Usage:
- *   const prompt = buildDraftPrompt(params);
- *   const raw = await callLLM(prompt.system, prompt.user);
- *   const result = parseDraftResponse(raw);
- *   // result = { subject, bodyText, bodyHtml }
- */
+//  Single-pass draft prompt. Parse output with parseDraftResponse().
+
+//  Usage:   const prompt = buildDraftPrompt(params);
+//    const raw = await callLLM(prompt.system, prompt.user);
+//    const result = parseDraftResponse(raw);
+   // result = { subject, bodyText, bodyHtml }
+ 
 export function buildDraftPrompt(params: BuildDraftPromptParams): DraftPromptMessages {
-  const { isOutreach, contextNote } = determineEmailContext(params);
+  const rawEmailText = htmlToPlainText(params.lastEmailHtml);
+  const { isOutreach, isHybrid, contextNote } = determineEmailContext(params, rawEmailText);
   const maxEmailChars = isOutreach ? 1500 : 2000;
-  const lastEmailText = truncateText(htmlToPlainText(params.lastEmailHtml), maxEmailChars);
+  const lastEmailText = truncateText(rawEmailText, maxEmailChars);
 
   // Base system prompt
   let system =
@@ -193,22 +230,34 @@ export function buildDraftPrompt(params: BuildDraftPromptParams): DraftPromptMes
     '1. Anrede NUR mit Nachname: "Sehr geehrter Herr Mueller" oder "Sehr geehrte Frau Schmidt". Niemals Vorname verwenden. ' +
     '2. Anrede geschlechtergerecht: "Sehr geehrter Herr" fuer Maenner, "Sehr geehrte Frau" fuer Frauen. Bei unbekanntem Geschlecht: "Guten Tag" mit Nachname. ' +
     '3. Statt "Vielen Dank fuer Ihre Nachricht" immer "Vielen Dank fuer Ihre Anfrage" verwenden. ' +
-    '4. Niemals entschuldigen oder bedauern. Kein "Wir bedauern", kein "Es tut uns leid", kein "Entschuldigung". ' +
-    'Stattdessen positiv formulieren: "Gerne helfen wir Ihnen", "Wir kuemmern uns darum", "Wir unterstuetzen Sie gerne".';
+    '4. VERBOTEN: "bedauern", "entschuldigen", "Entschuldigung", "es tut uns leid", "leider". Diese Woerter niemals verwenden. ' +
+    'Stattdessen positiv formulieren: "Gerne helfen wir Ihnen", "Wir kuemmern uns darum", "Wir unterstuetzen Sie gerne". ' +
+    '5. Erfinde keine Fakten, Termine, Preise oder Zusagen die nicht in der E-Mail stehen. Wenn du etwas nicht weisst, sage zu dich zu erkundigen.';
 
-  // Add outreach-specific guidance
+  // Hybrid mode: reply to email but acknowledge time gap
+  if (isHybrid) {
+    system +=
+      ' ' +
+      'ZEITLICHER KONTEXT: ' +
+      `Letzter Kontakt vor ${contextNote}. ` +
+      'Beantworte die E-Mail inhaltlich aber erwaehne kurz dass es eine Weile her ist. ' +
+      'Fokus liegt auf der Beantwortung der E-Mail, nicht auf der Wiederaufnahme. ' +
+      'Ein kurzer Satz wie "es freut uns wieder von Ihnen zu hoeren" genuegt.';
+  }
+
+  // Pure outreach mode: no substantial email to reply to
   if (isOutreach) {
     system +=
       ' ' +
       'OUTREACH-KONTEXT: ' +
       `Letzter Kontakt vor ${contextNote}. Dies ist eine Wiederaufnahme-E-Mail. ` +
       'Outreach-Regeln: ' +
-      '5. Beginne mit freundlicher Anerkennung der vergangenen Zeit. ' +
+      '6. Beginne mit freundlicher Anerkennung der vergangenen Zeit. ' +
       'Z.B.: "es ist eine Weile her seit unserem letzten Austausch" oder "ich melde mich wieder bei Ihnen". ' +
-      '6. Zeige Interesse an der aktuellen Situation des Kunden. Frage nach aktuellen Projekten oder Herausforderungen. ' +
-      '7. Falls die letzte E-Mail Themen enthielt, beziehe dich kurz darauf aber erkenne an dass sich die Situation geaendert haben koennte. ' +
-      '8. Biete proaktiv Unterstuetzung oder Updates zu relevanten Produkten an. ' +
-      '9. Tonfall: freundlich, respektvoll, nicht aufdringlich. Kein "Wir vermissen Sie" oder uebertrieben emotionale Formulierungen.';
+      '7. Zeige Interesse an der aktuellen Situation des Kunden. Frage nach aktuellen Projekten oder Herausforderungen. ' +
+      '8. Falls die letzte E-Mail Themen enthielt, beziehe dich kurz darauf aber erkenne an dass sich die Situation geaendert haben koennte. ' +
+      '9. Biete proaktiv Unterstuetzung oder Updates zu relevanten Produkten an. ' +
+      '10. Tonfall: freundlich, respektvoll, nicht aufdringlich. Kein "Wir vermissen Sie" oder uebertrieben emotionale Formulierungen.';
   }
 
   // Build user prompt
@@ -227,6 +276,11 @@ export function buildDraftPrompt(params: BuildDraftPromptParams): DraftPromptMes
       '- Wert und Unterstuetzung anbietet',
       '',
     );
+  } else if (isHybrid) {
+    userPromptParts.push(
+      `KONTEXT: Letzter Kontakt vor ${contextNote}. Beantworte die E-Mail und erwaehne kurz die vergangene Zeit.`,
+      '',
+    );
   } else {
     userPromptParts.push(
       'Beantworte die E-Mail unten. Identifiziere jede Frage und beantworte sie konkret.',
@@ -236,12 +290,14 @@ export function buildDraftPrompt(params: BuildDraftPromptParams): DraftPromptMes
   }
 
   userPromptParts.push(
-    'Format:',
-    'BETREFF: (Betreffzeile)',
+    'WICHTIG - Format genau einhalten:',
+    'BETREFF: (NUR die Betreffzeile, keine weiteren Worte)',
     '---',
-    '(E-Mail mit Absaetzen)',
+    '(E-Mail-Text mit Absaetzen, OHNE "BETREFF:" nochmal zu erwaehnen)',
     '',
     `Grussformel: "Mit freundlichen Gruessen" dann "${params.senderName}"`,
+    '',
+    'Die Betreffzeile steht NUR in der ersten Zeile nach "BETREFF:". Sie darf NICHT im E-Mail-Text wiederholt werden.',
     '',
     '--- E-MAIL ---',
     lastEmailText || '(kein Inhalt)',
