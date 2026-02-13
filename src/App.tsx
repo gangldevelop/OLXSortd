@@ -147,7 +147,7 @@ function App() {
   return (
     <>
     <LayoutShell
-      title="OLXSortd"
+      title="OLXOutreach"
       subtitle={<span>{user?.displayName} • {contacts.length} contacts</span>}
       right={
         <>

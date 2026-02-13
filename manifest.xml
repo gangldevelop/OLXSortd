@@ -2,13 +2,13 @@
 <OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0" xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="MailApp">
   <Id>12345678-1234-1234-1234-123456789012</Id>
   <Version>0.0.0.1</Version>
-  <ProviderName>OLXSortd</ProviderName>
+  <ProviderName>OLXOutreach</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
-  <DisplayName DefaultValue="OLXSortd - Email Contact Manager" />
+  <DisplayName DefaultValue="OLXOutreach - Email Contact Manager" />
   <Description DefaultValue="Manage your email contacts, analyze communication patterns, and send follow-up emails efficiently." />
-  <IconUrl DefaultValue="https://gangldevelop.github.io/OLXSortd/vite.svg"/>
-  <HighResolutionIconUrl DefaultValue="https://gangldevelop.github.io/OLXSortd/vite.svg"/>
-  <SupportUrl DefaultValue="https://gangldevelop.github.io/OLXSortd/"/>
+  <IconUrl DefaultValue="https://gangldevelop.github.io/OLXOutreach/vite.svg"/>
+  <HighResolutionIconUrl DefaultValue="https://gangldevelop.github.io/OLXOutreach/vite.svg"/>
+  <SupportUrl DefaultValue="https://gangldevelop.github.io/OLXOutreach/"/>
   <AppDomains>
     <AppDomain>https://gangldevelop.github.io</AppDomain>
   </AppDomains>
@@ -23,7 +23,7 @@
   <FormSettings>
     <Form xsi:type="ItemRead">
       <DesktopSettings>
-        <SourceLocation DefaultValue="https://gangldevelop.github.io/OLXSortd/outlook-addin.html"/>
+        <SourceLocation DefaultValue="https://gangldevelop.github.io/OLXOutreach/outlook-addin.html"/>
         <RequestedHeight>450</RequestedHeight>
       </DesktopSettings>
     </Form>
@@ -69,21 +69,21 @@
     </Hosts>
     <Resources>
       <bt:Images>
-        <bt:Image id="icon-16" DefaultValue="https://gangldevelop.github.io/OLXSortd/vite.svg" />
-        <bt:Image id="icon-32" DefaultValue="https://gangldevelop.github.io/OLXSortd/vite.svg" />
-        <bt:Image id="icon-80" DefaultValue="https://gangldevelop.github.io/OLXSortd/vite.svg" />
+        <bt:Image id="icon-16" DefaultValue="https://gangldevelop.github.io/OLXOutreach/vite.svg" />
+        <bt:Image id="icon-32" DefaultValue="https://gangldevelop.github.io/OLXOutreach/vite.svg" />
+        <bt:Image id="icon-80" DefaultValue="https://gangldevelop.github.io/OLXOutreach/vite.svg" />
       </bt:Images>
       <bt:Urls>
-        <bt:Url id="functionFile" DefaultValue="https://gangldevelop.github.io/OLXSortd/outlook-addin.html" />
-        <bt:Url id="messageReadTaskPaneUrl" DefaultValue="https://gangldevelop.github.io/OLXSortd/outlook-addin.html" />
+        <bt:Url id="functionFile" DefaultValue="https://gangldevelop.github.io/OLXOutreach/outlook-addin.html" />
+        <bt:Url id="messageReadTaskPaneUrl" DefaultValue="https://gangldevelop.github.io/OLXOutreach/outlook-addin.html" />
       </bt:Urls>
       <bt:ShortStrings>
-        <bt:String id="groupLabel" DefaultValue="OLXSortd" />
+        <bt:String id="groupLabel" DefaultValue="OLXOutreach" />
         <bt:String id="paneReadButtonLabel" DefaultValue="Contact Manager" />
-        <bt:String id="paneReadSuperTipTitle" DefaultValue="OLXSortd" />
+        <bt:String id="paneReadSuperTipTitle" DefaultValue="OLXOutreach" />
       </bt:ShortStrings>
       <bt:LongStrings>
-        <bt:String id="paneReadSuperTipText" DefaultValue="Open OLXSortd Contact Manager" />
+        <bt:String id="paneReadSuperTipText" DefaultValue="Open OLXOutreach Contact Manager" />
       </bt:LongStrings>
     </Resources>
   </VersionOverrides>

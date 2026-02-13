@@ -196,7 +196,7 @@ curl http://localhost:8080/v1/chat/completions \
 ### 5.1 Navigate to your project
 
 ```bash
-cd /Users/christiaandekock/Desktop/OlxOutreach/OLXSortd
+cd /Users/christiaandekock/Desktop/OlxOutreach/OLXOutreach
 ```
 
 ### 5.2 Update .env file

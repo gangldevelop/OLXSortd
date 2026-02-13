@@ -3,7 +3,7 @@
 set -e
 
 echo "======================================"
-echo "Local LLM Setup for OLXSortd"
+echo "Local LLM Setup for OLXOutreach"
 echo "======================================"
 echo ""
 

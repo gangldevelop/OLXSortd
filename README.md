@@ -1,8 +1,8 @@
-# OLXSortd 📧
+# OLXOutreach 📧
 
 **Smart Email Contact Management & Cold Outreach Tool for Outlook & Gmail**
 
-OLXSortd is an intelligent email contact management system focused on **outreach to contacts that have been contacted before but haven't been contacted in a while**. The app analyzes your email interactions to automatically categorize contacts and helps you **follow up and check in with contacts to potentially restart old leads**. Built as an Outlook Add-in and Gmail extension, it identifies opportunities for re-engagement and streamlines your outreach efforts.
+OLXOutreach is an intelligent email contact management system focused on **outreach to contacts that have been contacted before but haven't been contacted in a while**. The app analyzes your email interactions to automatically categorize contacts and helps you **follow up and check in with contacts to potentially restart old leads**. Built as an Outlook Add-in and Gmail extension, it identifies opportunities for re-engagement and streamlines your outreach efforts.
 
 ## ✨ Features
 
@@ -159,8 +159,8 @@ src/
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/your-username/olxsortd.git
-   cd olxsortd
+   git clone https://github.com/your-username/OLXOutreach.git
+   cd OLXOutreach
    ```
 
 2. **Install dependencies**
@@ -337,7 +337,7 @@ npm run build:github
 npm run deploy
 ```
 
-Your app will be available at: `https://yourusername.github.io/OLXSortd/`
+Your app will be available at: `https://yourusername.github.io/OLXOutreach/`
 
 For detailed deployment instructions, see [DEPLOYMENT.md](./DEPLOYMENT.md).
 
@@ -394,9 +394,9 @@ npm run build
    - Ensure recipient email is valid
 
 ### Getting Help
-- 📧 Email: support@olxsortd.com
-- 💬 Discord: [Join our community](https://discord.gg/olxsortd)
-- 🐛 Issues: [GitHub Issues](https://github.com/your-username/olxsortd/issues)
+- 📧 Email: support@OLXOutreach.com
+- 💬 Discord: [Join our community](https://discord.gg/OLXOutreach)
+- 🐛 Issues: [GitHub Issues](https://github.com/your-username/OLXOutreach/issues)
 
 ## 🗺️ Roadmap
 
@@ -419,4 +419,4 @@ npm run build
 ---
 
 
-*OLXSortd - Transform your email outreach with intelligent contact management*
+*OLXOutreach - Transform your email outreach with intelligent contact management*

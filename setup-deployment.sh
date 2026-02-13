@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# OLXSortd GitHub Pages Deployment Setup Script
-# This script helps you set up GitHub Pages deployment for OLXSortd
+# OLXOutreach GitHub Pages Deployment Setup Script
+# This script helps you set up GitHub Pages deployment for OLXOutreach
 
-echo "🚀 OLXSortd GitHub Pages Deployment Setup"
+echo "🚀 OLXOutreach GitHub Pages Deployment Setup"
 echo "========================================"
 
 # Check if we're in a git repository
@@ -15,7 +15,7 @@ fi
 # Check if GitHub remote exists
 if ! git remote get-url origin > /dev/null 2>&1; then
     echo "❌ Error: No GitHub remote found. Please add your GitHub repository:"
-    echo "   git remote add origin https://github.com/yourusername/OLXSortd.git"
+    echo "   git remote add origin https://github.com/yourusername/OLXOutreach.git"
     exit 1
 fi
 
@@ -32,7 +32,7 @@ if [ ! -f ".env" ]; then
 # Microsoft Azure Configuration
 VITE_AZURE_CLIENT_ID=your_azure_client_id_here
 VITE_AZURE_CLIENT_SECRET=your_azure_client_secret_here
-VITE_AZURE_REDIRECT_URI=https://yourusername.github.io/OLXSortd/auth/callback
+VITE_AZURE_REDIRECT_URI=https://yourusername.github.io/OLXOutreach/auth/callback
 
 # Google Gmail Configuration (Optional)
 VITE_GOOGLE_CLIENT_ID=your_google_client_id_here
@@ -69,6 +69,6 @@ echo "   git add ."
 echo "   git commit -m 'Deploy to GitHub Pages'"
 echo "   git push origin master"
 echo ""
-echo "Your app will be available at: https://yourusername.github.io/OLXSortd/"
+echo "Your app will be available at: https://yourusername.github.io/OLXOutreach/"
 echo ""
 echo "For detailed instructions, see DEPLOYMENT.md"

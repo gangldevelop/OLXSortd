@@ -1,8 +1,8 @@
-# OLXSortd Documentation
+# OLXOutreach Documentation
 
 ## AI-Powered Email Drafting
 
-OLXSortd now includes AI-powered email draft generation using local LLMs.
+OLXOutreach now includes AI-powered email draft generation using local LLMs.
 
 ### Features
 

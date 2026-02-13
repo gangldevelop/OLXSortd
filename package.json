@@ -1,5 +1,5 @@
 {
-  "name": "olxsortd",
+  "name": "OLXOutreach",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "build:github": "tsc -b && vite build --base=/OLXSortd/",
+    "build:github": "tsc -b && vite build --base=/OLXOutreach/",
     "build:outlook": "npm run build && npm run build:outlook-manifest",
     "build:gmail": "npm run build && npm run build:gmail-manifest",
     "build:outlook-manifest": "node scripts/build-outlook-manifest.js",
