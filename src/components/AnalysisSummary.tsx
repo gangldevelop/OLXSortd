@@ -198,7 +198,7 @@ export function AnalysisSummary({
       )}
 
       {/* Resellers (CSV) Section */}
-      {!!(resellerCsv && resellerCsv.length) && (
+      {/* {!!(resellerCsv && resellerCsv.length) && (
         <div className="glass-panel p-3">
           <h3 className="text-sm font-semibold text-slate-800 mb-2">Resellers ({resellerCsv.length})</h3>
           <div className="max-h-48 overflow-y-auto space-y-1.5">
@@ -258,10 +258,10 @@ export function AnalysisSummary({
             ))}
           </div>
         </div>
-      )}
+      )} */}
 
       {/* Reseller Portal Section */}
-      {resellerContacts.length > 0 && (
+      {/* {resellerContacts.length > 0 && (
         <div className="glass-panel p-3">
           <h3 className="text-sm font-semibold text-slate-800 mb-2">Reseller Portal ({resellerContacts.length})</h3>
           <div className="max-h-48 overflow-y-auto space-y-1.5">
@@ -291,7 +291,7 @@ export function AnalysisSummary({
               ))}
           </div>
         </div>
-      )}
+      )} */}
 
       {/* Crossware Customers Section */}
       {crosswareContacts.length > 0 && (
