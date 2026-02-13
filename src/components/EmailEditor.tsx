@@ -106,7 +106,7 @@ export function EmailEditor({
   return (
     <div className="glass-panel p-3">
       <div className="mb-4">
-        <h3 className="text-sm font-semibold text-slate-100 mb-3">Email Editor</h3>
+        <h3 className="text-sm font-semibold text-slate-800 mb-3">Email Editor</h3>
         <div className="flex flex-wrap gap-2">
           <button 
             onClick={onCancel}
@@ -130,7 +130,7 @@ export function EmailEditor({
             <button
               onClick={() => onRegenerate()}
               disabled={isRegenerating}
-              className="rounded-lg bg-indigo-500/20 px-3 py-1.5 text-xs font-medium text-indigo-200 transition-all duration-200 hover:bg-indigo-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="rounded-lg bg-indigo-100 px-3 py-1.5 text-xs font-medium text-indigo-800 transition-all duration-200 hover:bg-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed"
               title="Regenerate draft from original email context"
             >
               {isRegenerating ? (
@@ -147,11 +147,11 @@ export function EmailEditor({
       </div>
 
       {/* Recipient Info */}
-      <div className="mb-4 p-3 bg-white/[0.03] border border-white/10 rounded-lg">
+      <div className="mb-4 p-3 bg-slate-50 border border-slate-200 rounded-lg">
         <div className="flex items-center">
           <div>
-            <p className="text-xs font-medium text-slate-200">To: {contactName}</p>
-            <p className="text-xs text-slate-400">{contactEmail}</p>
+            <p className="text-xs font-medium text-slate-700">To: {contactName}</p>
+            <p className="text-xs text-slate-500">{contactEmail}</p>
           </div>
         </div>
       </div>
@@ -160,7 +160,7 @@ export function EmailEditor({
       <div className="grid grid-cols-1 gap-2 mb-4">
         {template.variables.map((variable) => (
           <div key={variable}>
-            <label className="block text-xs font-medium text-slate-300 mb-1">
+            <label className="block text-xs font-medium text-slate-600 mb-1">
               {variable.charAt(0).toUpperCase() + variable.slice(1)}
             </label>
             <input
@@ -176,7 +176,7 @@ export function EmailEditor({
 
       {/* Subject */}
       <div className="mb-3">
-        <label className="block text-xs font-medium text-slate-300 mb-1">
+        <label className="block text-xs font-medium text-slate-600 mb-1">
           Subject
         </label>
         <input
@@ -189,10 +189,10 @@ export function EmailEditor({
 
       {/* Rich Text Body */}
       <div>
-        <label className="block text-xs font-medium text-slate-300 mb-1">
+        <label className="block text-xs font-medium text-slate-600 mb-1">
           Message
         </label>
-        <div className="border border-white/10 rounded-lg overflow-hidden bg-slate-900/50">
+        <div className="border border-slate-200 rounded-lg overflow-hidden bg-white">
           <ReactQuill
             ref={quillRef}
             theme="snow"

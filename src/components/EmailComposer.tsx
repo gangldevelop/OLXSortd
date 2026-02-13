@@ -171,7 +171,7 @@ export function EmailComposer({
       )}
 
       {aiError && (
-        <p className="mt-2 text-center text-xs text-red-300">{aiError}</p>
+        <p className="mt-2 text-center text-xs text-red-600">{aiError}</p>
       )}
 
       {showEditor && selectedTemplate && (

@@ -194,12 +194,12 @@ function App() {
             {selectedCategory && (
               <div className="glass-panel-muted p-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-blue-200">
+                  <span className="text-sm font-medium text-blue-700">
                     Showing {getCategoryLabel(selectedCategory as ContactCategory)} contacts ({filteredContacts.length} of {baseContacts.length})
                   </span>
                   <button 
                     onClick={() => handleCategoryClick(null)}
-                    className="text-xs text-blue-300 hover:text-blue-200 font-medium"
+                    className="text-xs text-blue-600 hover:text-blue-800 font-medium"
                   >
                     Show All
                   </button>
@@ -210,7 +210,7 @@ function App() {
             {/* Contacts Section - Fixed height with scrolling */}
             <div className="flex-1 min-h-0">
               <div className="glass-panel p-3">
-                <h3 className="text-sm font-semibold text-slate-100 mb-3">
+                <h3 className="text-sm font-semibold text-slate-800 mb-3">
                   {selectedCategory ? `${getCategoryLabel(selectedCategory as ContactCategory)} Contacts` : 'All Contacts'} ({filteredContacts.length})
                 </h3>
                 

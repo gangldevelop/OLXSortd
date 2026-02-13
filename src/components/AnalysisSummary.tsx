@@ -83,32 +83,32 @@ export function AnalysisSummary({
   return (
     <div className="space-y-2">
       <div className="glass-panel p-2">
-        <h3 className="text-xs font-semibold text-slate-200 mb-2">Contact Categories</h3>
+        <h3 className="text-xs font-semibold text-slate-700 mb-2">Contact Categories</h3>
         <div className="flex flex-wrap gap-1">
           <button
             onClick={() => onCategoryClick(null)}
-            className="px-2 py-1 rounded text-xs font-medium bg-white/10 text-slate-200 hover:bg-white/20 transition-colors"
+            className="px-2 py-1 rounded text-xs font-medium bg-slate-200 text-slate-700 hover:bg-slate-300 transition-colors"
             title="Show all contacts"
           >
             All ({summary.total})
           </button>
           <button
             onClick={() => onCategoryClick('recent')}
-            className="px-2 py-1 rounded text-xs font-medium bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/25 transition-colors"
+            className="px-2 py-1 rounded text-xs font-medium bg-emerald-100 text-emerald-800 hover:bg-emerald-200 transition-colors"
             title={`${getCategoryLabel('recent')} — ${getCategoryTooltip('recent')}`}
           >
             {getCategoryLabel('recent')} ({summary.recent})
           </button>
           <button
             onClick={() => onCategoryClick('in_touch')}
-            className="px-2 py-1 rounded text-xs font-medium bg-blue-500/20 text-blue-200 hover:bg-blue-500/30 transition-colors"
+            className="px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 transition-colors"
             title={`${getCategoryLabel('in_touch')} — ${getCategoryTooltip('in_touch')}`}
           >
             {getCategoryLabel('in_touch')} ({summary.in_touch})
           </button>
           <button
             onClick={() => onCategoryClick('inactive')}
-            className="px-2 py-1 rounded text-xs font-medium bg-slate-500/20 text-slate-200 hover:bg-slate-500/30 transition-colors"
+            className="px-2 py-1 rounded text-xs font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
             title={`${getCategoryLabel('inactive')} — ${getCategoryTooltip('inactive')}`}
           >
             {getCategoryLabel('inactive')} ({summary.inactive})
@@ -118,7 +118,7 @@ export function AnalysisSummary({
 
       {contactsNeedingAttention.length > 0 && (
         <div className="glass-panel p-3">
-          <h3 className="text-sm font-semibold text-slate-100 mb-2">Needs Attention ({needsAttentionContacts.length})</h3>
+          <h3 className="text-sm font-semibold text-slate-800 mb-2">Needs Attention ({needsAttentionContacts.length})</h3>
 
           <div className="mb-2">
             <ContactSearch
@@ -140,18 +140,18 @@ export function AnalysisSummary({
               return (
                 <div
                   key={contact.id}
-                  className="flex items-start justify-between p-2 bg-white/[0.03] rounded-lg hover:bg-white/[0.07] transition-colors cursor-pointer border border-white/5"
+                  className="flex items-start justify-between p-2 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer border border-slate-200"
                   onClick={() => onShowContactDetails(contact)}
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-sm">{getCategoryIcon(contact.category)}</span>
-                      <p className="text-xs font-medium text-slate-100 truncate">{contact.name}</p>
+                      <p className="text-xs font-medium text-slate-800 truncate">{contact.name}</p>
                       <span title={getCategoryTooltip(contact.category)} className={`px-1.5 py-0.5 text-xs font-medium rounded border ${getCategoryColor(contact.category)}`}>
                         {getCategoryLabel(contact.category)}
                       </span>
                     </div>
-                    <div className="flex items-center gap-3 text-xs text-slate-400">
+                    <div className="flex items-center gap-3 text-xs text-slate-500">
                       <span>{contact.emailCount} emails</span>
                       <span>Response: {Math.round(contact.responseRate * 100)}%</span>
                       <span>{daysSinceLastContact !== null ? `${daysSinceLastContact}d ago` : 'Never contacted'}</span>
@@ -160,14 +160,14 @@ export function AnalysisSummary({
                   <div className="flex items-center gap-1">
                     <div className="relative" onClick={(e) => e.stopPropagation()}>
                       <details>
-                        <summary className="list-none cursor-pointer text-xs text-slate-300 hover:text-white px-2 py-1 rounded hover:bg-white/10">
+                        <summary className="list-none cursor-pointer text-xs text-slate-600 hover:text-slate-900 px-2 py-1 rounded hover:bg-slate-200">
                           Snooze ▾
                         </summary>
-                        <div className="absolute right-0 mt-1 bg-slate-900 border border-white/10 rounded shadow-sm z-10 text-xs">
+                        <div className="absolute right-0 mt-1 bg-white border border-slate-200 rounded shadow-lg z-10 text-xs">
                           {SNOOZE_DURATIONS.map((d) => (
                             <button
                               key={d}
-                              className="block px-3 py-1 hover:bg-white/10 w-full text-left text-slate-200"
+                              className="block px-3 py-1 hover:bg-slate-100 w-full text-left text-slate-700"
                               onClick={(e) => {
                                 e.preventDefault();
                                 onSnooze(contact, d);
@@ -184,7 +184,7 @@ export function AnalysisSummary({
                         e.stopPropagation();
                         onDraftEmail(contact);
                       }}
-                      className="text-xs text-blue-300 hover:text-blue-200 font-medium px-2 py-1 hover:bg-blue-500/15 rounded transition-colors ml-2"
+                      className="text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 hover:bg-blue-100 rounded transition-colors ml-2"
                       title="Draft email to this contact"
                     >
                       Draft
@@ -200,16 +200,16 @@ export function AnalysisSummary({
       {/* Resellers (CSV) Section */}
       {!!(resellerCsv && resellerCsv.length) && (
         <div className="glass-panel p-3">
-          <h3 className="text-sm font-semibold text-slate-100 mb-2">Resellers ({resellerCsv.length})</h3>
+          <h3 className="text-sm font-semibold text-slate-800 mb-2">Resellers ({resellerCsv.length})</h3>
           <div className="max-h-48 overflow-y-auto space-y-1.5">
             {resellerCsv.map((r) => (
-              <div key={r.id} className="flex items-start justify-between p-2 bg-white/[0.03] rounded-lg border border-white/5">
+              <div key={r.id} className="flex items-start justify-between p-2 bg-slate-50 rounded-lg border border-slate-200">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <p className="text-xs font-medium text-slate-100 truncate">{r.reseller}</p>
-                    <span className="px-1.5 py-0.5 text-[10px] font-medium rounded border bg-indigo-500/15 text-indigo-200 border-indigo-500/30">Reseller</span>
+                    <p className="text-xs font-medium text-slate-800 truncate">{r.reseller}</p>
+                    <span className="px-1.5 py-0.5 text-[10px] font-medium rounded border bg-indigo-100 text-indigo-800 border-indigo-200">Reseller</span>
                   </div>
-                  <div className="flex items-center gap-3 text-[11px] text-slate-400">
+                  <div className="flex items-center gap-3 text-[11px] text-slate-500">
                     <span className="truncate" title={r.contact}>{r.contact}</span>
                     {r.mobile && <span>{r.mobile}</span>}
                     {r.location && <span>{r.location}</span>}
@@ -249,7 +249,7 @@ export function AnalysisSummary({
                       };
                       onDraftEmail(virtualContact);
                     }}
-                    className="text-xs text-blue-300 hover:text-blue-200 font-medium px-2 py-1 hover:bg-blue-500/15 rounded transition-colors ml-2"
+                    className="text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 hover:bg-blue-100 rounded transition-colors ml-2"
                   >
                     Draft
                   </button>
@@ -263,27 +263,27 @@ export function AnalysisSummary({
       {/* Reseller Portal Section */}
       {resellerContacts.length > 0 && (
         <div className="glass-panel p-3">
-          <h3 className="text-sm font-semibold text-slate-100 mb-2">Reseller Portal ({resellerContacts.length})</h3>
+          <h3 className="text-sm font-semibold text-slate-800 mb-2">Reseller Portal ({resellerContacts.length})</h3>
           <div className="max-h-48 overflow-y-auto space-y-1.5">
             {resellerContacts.map((contact) => (
                 <div
                   key={contact.id}
-                  className="flex items-start justify-between p-2 bg-white/[0.03] rounded-lg hover:bg-white/[0.07] transition-colors cursor-pointer border border-white/5"
+                  className="flex items-start justify-between p-2 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer border border-slate-200"
                   onClick={() => onShowContactDetails(contact)}
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <p className="text-xs font-medium text-slate-100 truncate">{contact.name}</p>
-                      <span className="px-1.5 py-0.5 text-[10px] font-medium rounded border bg-indigo-500/15 text-indigo-200 border-indigo-500/30">Reseller</span>
+                      <p className="text-xs font-medium text-slate-800 truncate">{contact.name}</p>
+                      <span className="px-1.5 py-0.5 text-[10px] font-medium rounded border bg-indigo-100 text-indigo-800 border-indigo-200">Reseller</span>
                     </div>
-                    <p className="text-[11px] text-slate-400 truncate">{contact.email}</p>
+                    <p className="text-[11px] text-slate-500 truncate">{contact.email}</p>
                   </div>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       onDraftEmail(contact);
                     }}
-                    className="text-xs text-blue-300 hover:text-blue-200 font-medium px-2 py-1 hover:bg-blue-500/15 rounded transition-colors ml-2"
+                    className="text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 hover:bg-blue-100 rounded transition-colors ml-2"
                   >
                     Draft
                   </button>
@@ -296,19 +296,19 @@ export function AnalysisSummary({
       {/* Crossware Customers Section */}
       {crosswareContacts.length > 0 && (
         <div className="glass-panel p-3">
-          <h3 className="text-sm font-semibold text-slate-100 mb-2">Crossware Contacts ({crosswareContacts.length})</h3>
+          <h3 className="text-sm font-semibold text-slate-800 mb-2">Crossware Contacts ({crosswareContacts.length})</h3>
           <div className="max-h-48 overflow-y-auto space-y-1.5">
             {crosswareContacts.map((contact) => (
                 <div
                   key={contact.id}
-                  className="flex items-start justify-between p-2 bg-white/[0.03] rounded-lg border border-white/5"
+                  className="flex items-start justify-between p-2 bg-slate-50 rounded-lg border border-slate-200"
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <p className="text-xs font-medium text-slate-100 truncate">{contact.name}</p>
-                      <span className="px-1.5 py-0.5 text-[10px] font-medium rounded border bg-slate-500/20 text-slate-200 border-slate-500/30">Crossware</span>
+                      <p className="text-xs font-medium text-slate-800 truncate">{contact.name}</p>
+                      <span className="px-1.5 py-0.5 text-[10px] font-medium rounded border bg-slate-100 text-slate-700 border-slate-200">Crossware</span>
                     </div>
-                    <p className="text-[11px] text-slate-400 truncate">{contact.email}</p>
+                    <p className="text-[11px] text-slate-500 truncate">{contact.email}</p>
                   </div>
                 </div>
               ))}

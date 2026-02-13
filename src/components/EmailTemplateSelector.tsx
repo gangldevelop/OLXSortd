@@ -29,12 +29,12 @@ export function EmailTemplateSelector({ selectedCategory, onTemplateSelect }: Em
 
   return (
     <div className="glass-panel p-3">
-      <h3 className="text-sm font-semibold text-slate-100 mb-3">
+      <h3 className="text-sm font-semibold text-slate-800 mb-3">
         Templates - {getCategoryLabel(selectedCategory)}
       </h3>
       
       {categoryTemplates.length === 0 ? (
-        <p className="text-xs text-slate-400">No templates for {selectedCategory}</p>
+        <p className="text-xs text-slate-500">No templates for {selectedCategory}</p>
       ) : (
         <div className="space-y-2">
           {categoryTemplates.map((template) => (
@@ -42,15 +42,15 @@ export function EmailTemplateSelector({ selectedCategory, onTemplateSelect }: Em
               key={template.id}
               className={`p-2 border rounded cursor-pointer transition-colors ${
                 selectedTemplate === template.id 
-                  ? 'border-blue-500/50 bg-blue-500/15' 
-                  : 'border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.06]'
+                  ? 'border-blue-500 bg-blue-50' 
+                  : 'border-slate-200 bg-slate-50 hover:border-slate-300 hover:bg-slate-100'
               }`}
               onClick={() => handleTemplateChange(template.id)}
             >
               <div className="flex items-center justify-between">
                 <div className="flex-1 min-w-0">
-                  <h4 className="text-sm font-medium text-slate-100 truncate">{template.name}</h4>
-                  <p className="text-xs text-slate-400 truncate">{template.subject}</p>
+                  <h4 className="text-sm font-medium text-slate-800 truncate">{template.name}</h4>
+                  <p className="text-xs text-slate-500 truncate">{template.subject}</p>
                 </div>
                 <input
                   type="radio"
@@ -65,8 +65,8 @@ export function EmailTemplateSelector({ selectedCategory, onTemplateSelect }: Em
       )}
       
       {selectedTemplate && (
-        <div className="mt-3 p-2 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-          <p className="text-xs text-blue-200">
+        <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-xs text-blue-800">
             Template selected! Click "Create Draft" below.
           </p>
         </div>

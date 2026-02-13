@@ -67,27 +67,27 @@ export function Authentication({ onAuthenticated }: AuthenticationProps) {
 
   if (!isInitialized) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-slate-100 to-blue-50">
         <div className="text-center">
           <div className="relative mx-auto mb-6 h-10 w-10">
-            <div className="absolute inset-0 animate-spin rounded-full border-2 border-transparent border-t-blue-400 border-r-blue-400/30"></div>
+            <div className="absolute inset-0 animate-spin rounded-full border-2 border-transparent border-t-blue-500 border-r-blue-200"></div>
           </div>
-          <p className="text-sm text-slate-400 tracking-wide">Initializing...</p>
+          <p className="text-sm text-slate-600 tracking-wide">Initializing...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-slate-100 to-blue-50 px-4">
       {/* Subtle background glow */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-blue-500/5 rounded-full blur-3xl"></div>
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-blue-200/30 rounded-full blur-3xl"></div>
       </div>
 
       <div className="relative w-full max-w-sm">
         {/* Card */}
-        <div className="backdrop-blur-xl bg-white/[0.04] border border-white/[0.08] rounded-2xl shadow-2xl shadow-black/40 p-8">
+        <div className="backdrop-blur-xl bg-white border border-slate-200 rounded-2xl shadow-2xl shadow-slate-200/50 p-8">
           {/* Logo / Icon */}
           <div className="flex justify-center mb-6">
             <div className="h-14 w-14 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
@@ -99,10 +99,10 @@ export function Authentication({ onAuthenticated }: AuthenticationProps) {
 
           {/* Header */}
           <div className="text-center mb-8">
-            <h2 className="text-xl font-semibold text-white tracking-tight mb-2">
+            <h2 className="text-xl font-semibold text-slate-800 tracking-tight mb-2">
               Connect to Outlook
             </h2>
-            <p className="text-sm text-slate-400 leading-relaxed">
+            <p className="text-sm text-slate-600 leading-relaxed">
               Sign in with Microsoft to access your contacts and send emails.
             </p>
           </div>
@@ -113,7 +113,7 @@ export function Authentication({ onAuthenticated }: AuthenticationProps) {
               <svg className="h-5 w-5 text-red-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
               </svg>
-              <p className="text-sm text-red-300">{error}</p>
+              <p className="text-sm text-red-700">{error}</p>
             </div>
           )}
 
@@ -143,7 +143,7 @@ export function Authentication({ onAuthenticated }: AuthenticationProps) {
           </button>
 
           {/* Divider */}
-          <div className="my-6 border-t border-white/[0.06]"></div>
+          <div className="my-6 border-t border-slate-200"></div>
 
           {/* Permissions */}
           <div className="space-y-3">
@@ -156,11 +156,11 @@ export function Authentication({ onAuthenticated }: AuthenticationProps) {
                 { icon: 'M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0z', label: 'Contacts' },
                 { icon: 'M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75', label: 'Email (read & send)' },
               ].map(({ icon, label }) => (
-                <div key={label} className="flex items-center gap-3 rounded-lg bg-white/[0.03] px-3 py-2.5">
+                <div key={label} className="flex items-center gap-3 rounded-lg bg-slate-50 px-3 py-2.5">
                   <svg className="h-4 w-4 text-slate-500 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" d={icon} />
                   </svg>
-                  <span className="text-sm text-slate-400">{label}</span>
+                  <span className="text-sm text-slate-600">{label}</span>
                 </div>
               ))}
             </div>
@@ -168,7 +168,7 @@ export function Authentication({ onAuthenticated }: AuthenticationProps) {
         </div>
 
         {/* Footer */}
-        <p className="mt-6 text-center text-xs text-slate-600">
+        <p className="mt-6 text-center text-xs text-slate-500">
           Secured by Microsoft Authentication
         </p>
       </div>

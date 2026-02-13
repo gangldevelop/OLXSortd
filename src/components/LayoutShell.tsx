@@ -16,8 +16,8 @@ export function LayoutShell({
       <div className="glass-panel px-3 py-3">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h1 className="text-lg font-semibold text-white tracking-tight">{title}</h1>
-            {subtitle && <div className="text-xs text-slate-400">{subtitle}</div>}
+            <h1 className="text-lg font-semibold text-slate-800 tracking-tight">{title}</h1>
+            {subtitle && <div className="text-xs text-slate-500">{subtitle}</div>}
           </div>
           <div className="flex items-center gap-2">{right}</div>
         </div>
