@@ -24,6 +24,7 @@ export function EmailComposer({
     bodyHtml: string;
     bodyText: string;
   } | null>(null);
+  const [lastEmailContext, setLastEmailContext] = useState<string | null>(null);
 
   const handleTemplateSelect = (template: EmailTemplate) => {
     setSelectedTemplate(template);
@@ -58,8 +59,12 @@ export function EmailComposer({
         contactName: contact.name,
         senderName,
         language: 'de',
+        daysSinceLastContact: contact.analysis.metrics.daysSinceLastContact,
+        contactCategory: contact.category,
+        totalEmailCount: contact.emailCount,
       });
 
+      setLastEmailContext(lastEmail.html);
       setAiDraft({
         subject: draft.subject,
         bodyHtml: draft.bodyHtml,
@@ -80,6 +85,7 @@ export function EmailComposer({
     setShowEditor(false);
     setSelectedTemplate(null);
     setAiDraft(null);
+    setLastEmailContext(null);
     onClose();
   };
 
@@ -89,6 +95,8 @@ export function EmailComposer({
       alert(`Email sent to ${contact.email}!\nSubject: ${email.subject}`);
       setShowEditor(false);
       setSelectedTemplate(null);
+      setAiDraft(null);
+      setLastEmailContext(null);
       onClose();
     } catch (error) {
       console.error('Failed to send email:', error);
@@ -100,7 +108,38 @@ export function EmailComposer({
     setShowEditor(false);
     setSelectedTemplate(null);
     setAiDraft(null);
+    setLastEmailContext(null);
     onClose();
+  };
+
+  const handleRegenerate = async () => {
+    if (!lastEmailContext) return;
+    setIsGeneratingWithAi(true);
+    setAiError(null);
+    try {
+      const draft = await llmClient.generateDraft({
+        lastEmailHtml: lastEmailContext,
+        contactName: contact.name,
+        senderName,
+        language: 'de',
+        daysSinceLastContact: contact.analysis.metrics.daysSinceLastContact,
+        contactCategory: contact.category,
+        totalEmailCount: contact.emailCount,
+      });
+      setAiDraft({
+        subject: draft.subject,
+        bodyHtml: draft.bodyHtml,
+        bodyText: draft.bodyText,
+      });
+      setAiError(null);
+    } catch (error) {
+      console.error('Failed to regenerate AI draft:', error);
+      setAiError(
+        error instanceof Error ? error.message : 'Unexpected error while regenerating draft.'
+      );
+    } finally {
+      setIsGeneratingWithAi(false);
+    }
   };
 
   return (
@@ -117,22 +156,22 @@ export function EmailComposer({
         <div className="flex justify-center gap-2">
           <button
             onClick={handleCreateDraft}
-            className="text-xs bg-primary-600 hover:bg-primary-700 text-white px-3 py-1 rounded transition-colors"
+            className="btn-secondary"
           >
             Create Draft
           </button>
           <button
             onClick={handleGenerateWithAi}
             disabled={isGeneratingWithAi}
-            className="text-xs bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 disabled:cursor-not-allowed text-white px-3 py-1 rounded transition-colors"
+            className="btn-primary disabled:bg-blue-500/40"
           >
             {isGeneratingWithAi ? 'Generating…' : 'Generate with AI'}
           </button>
         </div>
       )}
 
-      {aiError && !showEditor && (
-        <p className="mt-2 text-center text-xs text-red-600">{aiError}</p>
+      {aiError && (
+        <p className="mt-2 text-center text-xs text-red-300">{aiError}</p>
       )}
 
       {showEditor && selectedTemplate && (
@@ -148,6 +187,8 @@ export function EmailComposer({
           onSave={handleSaveDraft}
           onSend={(e) => handleSendEmail(e)}
           onCancel={handleCancel}
+          onRegenerate={aiDraft ? handleRegenerate : undefined}
+          isRegenerating={isGeneratingWithAi}
         />
       )}
     </div>

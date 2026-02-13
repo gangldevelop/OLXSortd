@@ -15,6 +15,8 @@ interface EmailEditorProps {
   onSave: (draft: { subject: string; body: string; htmlBody: string }) => void;
   onSend: (email: { subject: string; body: string; htmlBody: string; to: string }) => void;
   onCancel: () => void;
+  onRegenerate?: () => void | Promise<void>;
+  isRegenerating?: boolean;
 }
 
 export function EmailEditor({
@@ -29,6 +31,8 @@ export function EmailEditor({
   onSave,
   onSend,
   onCancel,
+  onRegenerate,
+  isRegenerating = false,
 }: EmailEditorProps) {
   const [variables, setVariables] = useState({
     name: contactName,
@@ -73,6 +77,15 @@ export function EmailEditor({
     setHtmlBody(processed.body);
   }, [variables, template, enableTemplateAutoUpdate]);
 
+  // Sync editor when parent updates draft (e.g. after regenerate) - AI drafts only
+  React.useEffect(() => {
+    if (!enableTemplateAutoUpdate) {
+      if (initialSubject !== undefined) setSubject(initialSubject);
+      if (initialBodyText !== undefined) setBody(initialBodyText);
+      if (initialHtmlBody !== undefined) setHtmlBody(initialHtmlBody);
+    }
+  }, [initialSubject, initialBodyText, initialHtmlBody, enableTemplateAutoUpdate]);
+
   const handleVariableChange = (key: string, value: string) => {
     setVariables(prev => ({ ...prev, [key]: value }));
   };
@@ -91,37 +104,54 @@ export function EmailEditor({
   };
 
   return (
-    <div className="bg-white rounded border p-3">
+    <div className="glass-panel p-3">
       <div className="mb-4">
-        <h3 className="text-sm font-semibold text-gray-900 mb-3">Email Editor</h3>
+        <h3 className="text-sm font-semibold text-slate-100 mb-3">Email Editor</h3>
         <div className="flex flex-wrap gap-2">
           <button 
             onClick={onCancel}
-            className="text-xs bg-gray-200 hover:bg-gray-300 text-gray-800 px-3 py-1 rounded transition-colors"
+            className="btn-ghost"
           >
             Cancel
           </button>
           <button 
             onClick={handleSave}
-            className="text-xs bg-gray-200 hover:bg-gray-300 text-gray-800 px-3 py-1 rounded transition-colors"
+            className="btn-secondary"
           >
             Save Draft
           </button>
           <button 
             onClick={handleSend}
-            className="text-xs bg-primary-600 hover:bg-primary-700 text-white px-3 py-1 rounded transition-colors"
+            className="btn-primary"
           >
             Send Email
           </button>
+          {onRegenerate && (
+            <button
+              onClick={() => onRegenerate()}
+              disabled={isRegenerating}
+              className="rounded-lg bg-indigo-500/20 px-3 py-1.5 text-xs font-medium text-indigo-200 transition-all duration-200 hover:bg-indigo-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Regenerate draft from original email context"
+            >
+              {isRegenerating ? (
+                <>
+                  <span className="inline-block animate-spin mr-1">⟳</span>
+                  Regenerating…
+                </>
+              ) : (
+                <>⟳ Regenerate</>
+              )}
+            </button>
+          )}
         </div>
       </div>
 
       {/* Recipient Info */}
-      <div className="mb-4 p-2 bg-gray-50 rounded">
+      <div className="mb-4 p-3 bg-white/[0.03] border border-white/10 rounded-lg">
         <div className="flex items-center">
           <div>
-            <p className="text-xs font-medium text-gray-900">To: {contactName}</p>
-            <p className="text-xs text-gray-500">{contactEmail}</p>
+            <p className="text-xs font-medium text-slate-200">To: {contactName}</p>
+            <p className="text-xs text-slate-400">{contactEmail}</p>
           </div>
         </div>
       </div>
@@ -130,14 +160,14 @@ export function EmailEditor({
       <div className="grid grid-cols-1 gap-2 mb-4">
         {template.variables.map((variable) => (
           <div key={variable}>
-            <label className="block text-xs font-medium text-gray-700 mb-1">
+            <label className="block text-xs font-medium text-slate-300 mb-1">
               {variable.charAt(0).toUpperCase() + variable.slice(1)}
             </label>
             <input
               type="text"
               value={variables[variable as keyof typeof variables]}
               onChange={(e) => handleVariableChange(variable, e.target.value)}
-              className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-transparent"
+              className="input-glass text-xs px-2 py-1"
               placeholder={`Enter ${variable}`}
             />
           </div>
@@ -146,23 +176,23 @@ export function EmailEditor({
 
       {/* Subject */}
       <div className="mb-3">
-        <label className="block text-xs font-medium text-gray-700 mb-1">
+        <label className="block text-xs font-medium text-slate-300 mb-1">
           Subject
         </label>
         <input
           type="text"
           value={subject}
           onChange={(e) => setSubject(e.target.value)}
-          className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-transparent"
+          className="input-glass text-xs px-2 py-1"
         />
       </div>
 
       {/* Rich Text Body */}
       <div>
-        <label className="block text-xs font-medium text-gray-700 mb-1">
+        <label className="block text-xs font-medium text-slate-300 mb-1">
           Message
         </label>
-        <div className="border border-gray-300 rounded overflow-hidden">
+        <div className="border border-white/10 rounded-lg overflow-hidden bg-slate-900/50">
           <ReactQuill
             ref={quillRef}
             theme="snow"

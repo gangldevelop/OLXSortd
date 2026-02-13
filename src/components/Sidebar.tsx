@@ -25,9 +25,9 @@ export function Sidebar() {
   ];
 
   return (
-    <aside className="w-64 bg-white shadow-sm border-r border-gray-200 h-screen">
+    <aside className="w-64 bg-slate-950/70 backdrop-blur-xl border-r border-white/10 h-screen">
       <div className="p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-6">Navigation</h2>
+        <h2 className="text-lg font-semibold text-slate-100 mb-6">Navigation</h2>
         
         <nav className="space-y-2 mb-8">
           {menuItems.map((item, index) => (
@@ -35,8 +35,8 @@ export function Sidebar() {
               key={index}
               className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                 item.active
-                  ? 'bg-primary-100 text-primary-700'
-                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                  ? 'bg-blue-500/20 text-blue-200 border border-blue-500/30'
+                  : 'text-slate-300 hover:bg-white/10 hover:text-white'
               }`}
             >
               <div className="flex items-center space-x-3">
@@ -44,7 +44,7 @@ export function Sidebar() {
                 <span>{item.label}</span>
               </div>
               {item.count > 0 && (
-                <span className="bg-gray-200 text-gray-600 px-2 py-1 rounded-full text-xs">
+                <span className="bg-white/10 text-slate-300 px-2 py-1 rounded-full text-xs">
                   {item.count}
                 </span>
               )}
@@ -52,13 +52,13 @@ export function Sidebar() {
           ))}
         </nav>
 
-        <div className="border-t border-gray-200 pt-6">
-          <h3 className="text-sm font-medium text-gray-900 mb-4">Quick Actions</h3>
+        <div className="border-t border-white/10 pt-6">
+          <h3 className="text-sm font-medium text-slate-200 mb-4">Quick Actions</h3>
           <div className="space-y-2">
             {quickActions.map((action, index) => (
               <button
                 key={index}
-                className="w-full flex items-center space-x-3 px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900 rounded-lg transition-colors"
+                className="w-full flex items-center space-x-3 px-3 py-2 text-sm text-slate-300 hover:bg-white/10 hover:text-white rounded-lg transition-colors"
               >
                 <action.icon className="h-4 w-4" />
                 <span>{action.label}</span>

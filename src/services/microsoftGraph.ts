@@ -42,6 +42,18 @@ class MicrosoftGraphFacade {
   async getAccessToken(): Promise<string | null> { return this.msal.getAccessToken(); }
   async debugAuthStatus(): Promise<void> { return this.msal.debugAuthStatus(); }
 
+  /** Clears email caches so next fetch returns fresh data. Call when user requests a refresh (Quick/All). */
+  clearEmailCaches(): void {
+    this.lastEmailCache.clear();
+    try {
+      ['olx_email_cache_200', 'olx_email_cache_50000', 'olx_email_cache_1000'].forEach((key) =>
+        localStorage.removeItem(key)
+      );
+    } catch {
+      // ignore
+    }
+  }
+
   // Users
   async getCurrentUser(): Promise<{ displayName: string; mail: string; id: string }> {
     return this.users.getCurrentUser();

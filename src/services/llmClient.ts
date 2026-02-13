@@ -1,10 +1,13 @@
-import { buildDraftPrompt } from '../utils/llmPrompt';
+import { buildDraftPrompt, parseDraftResponse } from '../utils/llmPrompt';
 
 export interface GenerateDraftParams {
   lastEmailHtml: string;
   contactName: string;
   senderName: string;
   language?: string;
+  daysSinceLastContact?: number;
+  contactCategory?: 'recent' | 'in_touch' | 'inactive';
+  totalEmailCount?: number;
 }
 
 export interface GeneratedDraft {
@@ -73,64 +76,38 @@ class DefaultLlmClient implements LlmClient {
       lastEmailHtml: params.lastEmailHtml,
       contactName: params.contactName,
       senderName: params.senderName,
-      language: params.language ?? 'de',
+      daysSinceLastContact: params.daysSinceLastContact,
+      contactCategory: params.contactCategory,
+      totalEmailCount: params.totalEmailCount,
     });
-
-    const payload =
-      PROVIDER === 'openai-compatible' || PROVIDER === 'managed'
-        ? {
-            model: MODEL,
-            messages: [
-              { role: 'system', content: system },
-              { role: 'user', content: user },
-            ],
-            temperature: 0.3,
-            max_tokens: 400,
-            stop: ["<|end|>", "<|endoftext|>", "\n\n\n"],
-            stream: false,
-          }
-        : {
-            model: MODEL,
-            messages: [
-              { role: 'system', content: system },
-              { role: 'user', content: user },
-            ],
-            temperature: 0.3,
-            max_tokens: 400,
-            stop: ["<|end|>", "<|endoftext|>", "\n\n\n"],
-            stream: false,
-          };
-
+  
+    const payload = {
+      model: MODEL,
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: user },
+      ],
+      temperature: 0.3,
+      max_tokens: 512,
+      stream: false,
+    };
+  
     const raw = await callOpenAiCompatible(payload);
-
+  
     const choice = (raw as any)?.choices?.[0];
     const content: string | undefined = choice?.message?.content;
-
+  
     if (!content) {
       throw new Error('LLM response did not contain any content.');
     }
-
-    try {
-      const parsed = JSON.parse(content) as Partial<GeneratedDraft>;
-
-      if (!parsed.subject || !parsed.bodyHtml || !parsed.bodyText) {
-        throw new Error('Parsed JSON is missing required fields.');
-      }
-
-      return {
-        subject: parsed.subject,
-        bodyHtml: parsed.bodyHtml,
-        bodyText: parsed.bodyText,
-      };
-    } catch (error) {
-      console.warn('Failed to parse LLM JSON content, falling back to simple mapping.', error);
-
-      return {
-        subject: 'Antwort auf Ihre letzte E‑Mail',
-        bodyHtml: `<p>${content}</p>`,
-        bodyText: content,
-      };
-    }
+  
+    const parsed = parseDraftResponse(content);
+  
+    return {
+      subject: parsed.subject || 'Antwort auf Ihre Anfrage',
+      bodyHtml: parsed.bodyHtml,
+      bodyText: parsed.bodyText,
+    };
   }
 }
 

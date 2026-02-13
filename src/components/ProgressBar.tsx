@@ -13,20 +13,20 @@ export function ProgressBar({ progress, isVisible }: ProgressBarProps) {
   // Show loading state if progress is null but isVisible is true
   if (!progress) {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+      <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center z-50">
+        <div className="glass-panel p-6 w-full max-w-md mx-4">
           <div className="text-center mb-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            <h3 className="text-lg font-semibold text-slate-100 mb-2">
               Analyzing Contacts
             </h3>
-            <p className="text-sm text-gray-600 mb-4">
+            <p className="text-sm text-slate-400 mb-4">
               Initializing analysis...
             </p>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-3 mb-4">
+          <div className="w-full bg-white/10 rounded-full h-3 mb-4">
             <div className="h-3 rounded-full bg-blue-400 animate-pulse" style={{ width: '30%' }} />
           </div>
-          <div className="text-center text-sm text-gray-600">
+          <div className="text-center text-sm text-slate-400">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-2"></div>
             Preparing contact analysis...
           </div>
@@ -58,19 +58,19 @@ export function ProgressBar({ progress, isVisible }: ProgressBarProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4 shadow-xl">
+    <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center z-50">
+      <div className="glass-panel p-6 w-full max-w-md mx-4 shadow-xl">
         <div className="text-center mb-4">
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+          <h3 className="text-lg font-semibold text-slate-100 mb-2">
             Analyzing Contacts
           </h3>
-          <p className="text-sm text-gray-600 mb-4">
+          <p className="text-sm text-slate-400 mb-4">
             {progress.message}
           </p>
         </div>
 
         {/* Progress Bar */}
-        <div className="w-full bg-gray-200 rounded-full h-4 mb-4 overflow-hidden">
+        <div className="w-full bg-white/10 rounded-full h-4 mb-4 overflow-hidden">
           <div 
             className={`h-4 rounded-full transition-all duration-200 ease-out ${getProgressColor(progress.progress)}`}
             style={{ width: `${Math.max(0, Math.min(100, progress.progress))}%` }}
@@ -79,26 +79,26 @@ export function ProgressBar({ progress, isVisible }: ProgressBarProps) {
 
         {/* Progress Details */}
         <div className="flex justify-between items-center text-sm font-medium mb-4">
-          <span className="text-gray-900">{Math.round(progress.progress)}%</span>
+          <span className="text-slate-100">{Math.round(progress.progress)}%</span>
           {progress.estimatedTimeRemaining && progress.estimatedTimeRemaining > 0 && (
-            <span className="text-gray-600">~{formatTime(progress.estimatedTimeRemaining)} remaining</span>
+            <span className="text-slate-400">~{formatTime(progress.estimatedTimeRemaining)} remaining</span>
           )}
         </div>
 
         {/* Items Progress */}
         {progress.totalItems > 0 && (
-          <div className="bg-gray-50 rounded-lg p-3 mb-4">
-            <div className="text-xs font-semibold text-gray-700 mb-2">Processing Status</div>
+          <div className="bg-white/[0.03] rounded-lg border border-white/10 p-3 mb-4">
+            <div className="text-xs font-semibold text-slate-300 mb-2">Processing Status</div>
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div>
-                <span className="text-gray-500">Items:</span>
-                <span className="ml-2 font-medium text-gray-900">
+                <span className="text-slate-500">Items:</span>
+                <span className="ml-2 font-medium text-slate-100">
                   {progress.itemsProcessed.toLocaleString()} / {progress.totalItems.toLocaleString()}
                 </span>
               </div>
               <div>
-                <span className="text-gray-500">Complete:</span>
-                <span className="ml-2 font-medium text-gray-900">
+                <span className="text-slate-500">Complete:</span>
+                <span className="ml-2 font-medium text-slate-100">
                   {progress.totalItems > 0 ? Math.round((progress.itemsProcessed / progress.totalItems) * 100) : 0}%
                 </span>
               </div>
@@ -108,12 +108,12 @@ export function ProgressBar({ progress, isVisible }: ProgressBarProps) {
 
         {/* Stage Indicator */}
         <div className="text-xs">
-          <div className="bg-blue-50 rounded-lg p-3">
-            <div className="font-semibold text-blue-900 mb-1 flex items-center gap-2">
+          <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+            <div className="font-semibold text-blue-200 mb-1 flex items-center gap-2">
               <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
               Current Stage: {progress.stage.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
             </div>
-            <div className="text-blue-700">
+            <div className="text-blue-300">
               {progress.stage === 'fetching_data' && (
                 'Fetching contacts and email interactions from Microsoft Graph...'
               )}

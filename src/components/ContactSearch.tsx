@@ -194,12 +194,12 @@ export function ContactSearch({
           value={filters.searchTerm}
           onChange={(e) => handleSearchChange(e.target.value)}
           placeholder={placeholder}
-          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="input-glass"
         />
         {filters.searchTerm && (
           <button
             onClick={() => handleSearchChange('')}
-            className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            className="absolute right-2 top-1/2 transform -translate-y-1/2 text-slate-500 hover:text-slate-300"
           >
             ✕
           </button>
@@ -211,7 +211,7 @@ export function ContactSearch({
         <select
           value={filters.lastContactFilter}
           onChange={(e) => handleLastContactChange(e.target.value)}
-          className="text-xs px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="select-glass"
         >
           <option value="all">All Time</option>
           <option value="recent">Last 7 days</option>
@@ -224,7 +224,7 @@ export function ContactSearch({
         <select
           value={filters.sortBy}
           onChange={(e) => handleSortChange(e.target.value as FilterOptions['sortBy'])}
-          className="text-xs px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="select-glass"
         >
           <option value="default">Smart Sort (Best First)</option>
           <option value="name">Name A-Z</option>
@@ -236,7 +236,7 @@ export function ContactSearch({
         {showAdvancedFilters && (
           <button
             onClick={() => setShowAdvanced(!showAdvanced)}
-            className="text-xs px-2 py-1 border border-gray-300 rounded hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="text-xs px-2 py-1 border border-white/10 rounded bg-white/5 text-slate-300 hover:bg-white/10 focus:outline-none focus:ring-1 focus:ring-blue-500/40"
           >
             {showAdvanced ? 'Hide' : 'More'} Filters
           </button>
@@ -245,7 +245,7 @@ export function ContactSearch({
         {hasActiveFilters && (
           <button
             onClick={clearFilters}
-            className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="text-xs px-2 py-1 bg-white/10 hover:bg-white/20 rounded text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500/40"
           >
             Clear All
           </button>
@@ -254,9 +254,9 @@ export function ContactSearch({
 
       {/* Advanced Filters */}
       {showAdvanced && showAdvancedFilters && (
-        <div className="bg-gray-50 p-3 rounded border space-y-3">
+        <div className="bg-white/[0.03] p-3 rounded-lg border border-white/10 space-y-3">
           <div>
-            <label className="text-xs font-medium text-gray-700 block mb-1">
+            <label className="text-xs font-medium text-slate-300 block mb-1">
               Response Rate Range (%)
             </label>
             <div className="flex gap-2 items-center">
@@ -264,23 +264,23 @@ export function ContactSearch({
                 type="text"
                 value={filters.responseRateRange[0] === 0 ? '' : filters.responseRateRange[0].toString()}
                 onChange={(e) => handleResponseRateInput(0, e.target.value)}
-                className="w-16 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-16 px-2 py-1 text-xs border border-white/10 bg-slate-950/40 rounded text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500/40"
                 placeholder="Min"
               />
-              <span className="text-xs text-gray-500">to</span>
+              <span className="text-xs text-slate-400">to</span>
               <input
                 type="text"
                 value={filters.responseRateRange[1] === 100 ? '' : filters.responseRateRange[1].toString()}
                 onChange={(e) => handleResponseRateInput(1, e.target.value)}
-                className="w-16 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-16 px-2 py-1 text-xs border border-white/10 bg-slate-950/40 rounded text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500/40"
                 placeholder="Max"
               />
-              <span className="text-xs text-gray-500">%</span>
+              <span className="text-xs text-slate-400">%</span>
             </div>
           </div>
 
           <div>
-            <label className="text-xs font-medium text-gray-700 block mb-1">
+            <label className="text-xs font-medium text-slate-300 block mb-1">
               Email Count Range
             </label>
             <div className="flex gap-2 items-center">
@@ -288,18 +288,18 @@ export function ContactSearch({
                 type="text"
                 value={filters.emailCountRange[0] === 0 ? '' : filters.emailCountRange[0].toString()}
                 onChange={(e) => handleEmailCountInput(0, e.target.value)}
-                className="w-16 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-16 px-2 py-1 text-xs border border-white/10 bg-slate-950/40 rounded text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500/40"
                 placeholder="Min"
               />
-              <span className="text-xs text-gray-500">to</span>
+              <span className="text-xs text-slate-400">to</span>
               <input
                 type="text"
                 value={filters.emailCountRange[1] === 1000 ? '' : filters.emailCountRange[1].toString()}
                 onChange={(e) => handleEmailCountInput(1, e.target.value)}
-                className="w-16 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-16 px-2 py-1 text-xs border border-white/10 bg-slate-950/40 rounded text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500/40"
                 placeholder="Max"
               />
-              <span className="text-xs text-gray-500">emails</span>
+              <span className="text-xs text-slate-400">emails</span>
             </div>
           </div>
         </div>

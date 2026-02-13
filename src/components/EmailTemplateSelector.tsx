@@ -28,13 +28,13 @@ export function EmailTemplateSelector({ selectedCategory, onTemplateSelect }: Em
   };
 
   return (
-    <div className="bg-white rounded border p-3">
-      <h3 className="text-sm font-semibold text-gray-900 mb-3">
+    <div className="glass-panel p-3">
+      <h3 className="text-sm font-semibold text-slate-100 mb-3">
         Templates - {getCategoryLabel(selectedCategory)}
       </h3>
       
       {categoryTemplates.length === 0 ? (
-        <p className="text-xs text-gray-500">No templates for {selectedCategory}</p>
+        <p className="text-xs text-slate-400">No templates for {selectedCategory}</p>
       ) : (
         <div className="space-y-2">
           {categoryTemplates.map((template) => (
@@ -42,21 +42,21 @@ export function EmailTemplateSelector({ selectedCategory, onTemplateSelect }: Em
               key={template.id}
               className={`p-2 border rounded cursor-pointer transition-colors ${
                 selectedTemplate === template.id 
-                  ? 'border-primary-500 bg-primary-50' 
-                  : 'border-gray-200 hover:border-gray-300'
+                  ? 'border-blue-500/50 bg-blue-500/15' 
+                  : 'border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.06]'
               }`}
               onClick={() => handleTemplateChange(template.id)}
             >
               <div className="flex items-center justify-between">
                 <div className="flex-1 min-w-0">
-                  <h4 className="text-sm font-medium text-gray-900 truncate">{template.name}</h4>
-                  <p className="text-xs text-gray-600 truncate">{template.subject}</p>
+                  <h4 className="text-sm font-medium text-slate-100 truncate">{template.name}</h4>
+                  <p className="text-xs text-slate-400 truncate">{template.subject}</p>
                 </div>
                 <input
                   type="radio"
                   checked={selectedTemplate === template.id}
                   onChange={() => handleTemplateChange(template.id)}
-                  className="text-primary-600 ml-2"
+                  className="text-blue-500 ml-2"
                 />
               </div>
             </div>
@@ -65,8 +65,8 @@ export function EmailTemplateSelector({ selectedCategory, onTemplateSelect }: Em
       )}
       
       {selectedTemplate && (
-        <div className="mt-3 p-2 bg-gray-50 rounded">
-          <p className="text-xs text-gray-600">
+        <div className="mt-3 p-2 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+          <p className="text-xs text-blue-200">
             Template selected! Click "Create Draft" below.
           </p>
         </div>

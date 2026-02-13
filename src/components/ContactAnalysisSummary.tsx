@@ -44,33 +44,33 @@ export function ContactAnalysisSummary({ contacts, onContactSelect }: ContactAna
   return (
     <div className="space-y-6">
       {/* Summary Stats */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Contact Analysis Summary</h3>
+      <div className="glass-panel p-6">
+        <h3 className="text-lg font-semibold text-slate-100 mb-4">Contact Analysis Summary</h3>
         
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <div className="text-center">
-            <div className="text-2xl font-bold text-gray-900">{summary.total}</div>
-            <div className="text-sm text-gray-600">Total</div>
+            <div className="text-2xl font-bold text-slate-100">{summary.total}</div>
+            <div className="text-sm text-slate-400">Total</div>
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold text-green-600">{summary.recent}</div>
-            <div className="text-sm text-gray-600">Recent</div>
+            <div className="text-sm text-slate-400">Recent</div>
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold text-blue-600">{summary.in_touch}</div>
-            <div className="text-sm text-gray-600">In Touch</div>
+            <div className="text-sm text-slate-400">In Touch</div>
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold text-orange-600">{summary.inactive}</div>
-            <div className="text-sm text-gray-600">Inactive</div>
+            <div className="text-sm text-slate-400">Inactive</div>
           </div>
         </div>
       </div>
 
       {/* Contacts Needing Attention */}
       {contactsNeedingAttention.length > 0 && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+        <div className="glass-panel p-6">
+          <h3 className="text-lg font-semibold text-slate-100 mb-4">
             Contacts Needing Attention ({contactsNeedingAttention.length})
           </h3>
           
@@ -78,26 +78,26 @@ export function ContactAnalysisSummary({ contacts, onContactSelect }: ContactAna
             {contactsNeedingAttention.slice(0, 5).map((contact) => (
               <div 
                 key={contact.id}
-                className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+                className="flex items-center justify-between p-3 border border-white/10 rounded-lg bg-white/[0.03] hover:bg-white/[0.07] cursor-pointer transition-colors"
                 onClick={() => onContactSelect(contact)}
               >
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-lg">{getCategoryIcon(contact.category)}</span>
-                    <h4 className="font-medium text-gray-900">{contact.name}</h4>
+                    <h4 className="font-medium text-slate-100">{contact.name}</h4>
                     <span className={`px-2 py-1 text-xs font-medium rounded-full border ${getCategoryColor(contact.category)}`}>
                       {contact.category}
                     </span>
                   </div>
-                  <p className="text-sm text-gray-500">{contact.email}</p>
-                  <div className="flex items-center gap-4 mt-1 text-xs text-gray-600">
+                  <p className="text-sm text-slate-400">{contact.email}</p>
+                  <div className="flex items-center gap-4 mt-1 text-xs text-slate-400">
                     <span>{contact.emailCount} emails</span>
                     <span>Response rate: {Math.round(contact.responseRate * 100)}%</span>
                     <span>Confidence: {contact.analysis.score}%</span>
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-sm font-medium text-gray-900">
+                  <div className="text-sm font-medium text-slate-100">
                     {contact.lastContactDate 
                       ? `${Math.floor((Date.now() - contact.lastContactDate.getTime()) / (24 * 60 * 60 * 1000))} days ago`
                       : 'Never contacted'
@@ -110,7 +110,7 @@ export function ContactAnalysisSummary({ contacts, onContactSelect }: ContactAna
           
           {contactsNeedingAttention.length > 5 && (
             <div className="mt-4 text-center">
-              <button className="text-primary-600 hover:text-primary-700 text-sm font-medium">
+              <button className="text-blue-300 hover:text-blue-200 text-sm font-medium">
                 View All {contactsNeedingAttention.length} Contacts
               </button>
             </div>
@@ -119,8 +119,8 @@ export function ContactAnalysisSummary({ contacts, onContactSelect }: ContactAna
       )}
 
       {/* Analysis Insights */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Key Insights</h3>
+      <div className="glass-panel p-6">
+        <h3 className="text-lg font-semibold text-slate-100 mb-4">Key Insights</h3>
         
         <div className="space-y-3">
           {summary.recent > 0 && (

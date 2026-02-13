@@ -128,7 +128,7 @@ function App() {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen app-surface flex items-center justify-center p-4">
         <div className="w-full max-w-md">
           <Authentication onAuthenticated={handleAuthenticated} />
         </div>
@@ -138,7 +138,7 @@ function App() {
 
       if (isAnalyzing) {
         return (
-          <div className="min-h-screen bg-gray-50">
+          <div className="min-h-screen app-surface">
             <ProgressBar progress={progress} isVisible={isAnalyzing} />
           </div>
         );
@@ -153,7 +153,7 @@ function App() {
         <>
           <button
             onClick={() => analyzeContacts('quick')}
-            className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded transition-colors"
+            className="btn-primary"
             disabled={isAnalyzing}
             title="Quick analysis (~30s) - Recent contacts only"
           >
@@ -161,7 +161,7 @@ function App() {
           </button>
           <button
             onClick={() => analyzeContacts('comprehensive')}
-            className="text-xs bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded transition-colors"
+            className="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-medium text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-rose-500 hover:shadow-md hover:shadow-rose-500/20 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
             disabled={isAnalyzing}
             title="Comprehensive analysis (~5-15min) - All contacts"
           >
@@ -174,7 +174,7 @@ function App() {
               setUser(null);
               setContacts([]);
             }}
-            className="text-xs bg-gray-600 hover:bg-gray-700 text-white px-3 py-1 rounded transition-colors"
+            className="btn-secondary"
           >
             Sign Out
           </button>
@@ -192,14 +192,14 @@ function App() {
             
             {/* Category Filter Indicator */}
             {selectedCategory && (
-              <div className="bg-blue-50 border border-blue-200 rounded p-1.5">
+              <div className="glass-panel-muted p-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-blue-800">
+                  <span className="text-sm font-medium text-blue-200">
                     Showing {getCategoryLabel(selectedCategory as ContactCategory)} contacts ({filteredContacts.length} of {baseContacts.length})
                   </span>
                   <button 
                     onClick={() => handleCategoryClick(null)}
-                    className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                    className="text-xs text-blue-300 hover:text-blue-200 font-medium"
                   >
                     Show All
                   </button>
@@ -209,8 +209,8 @@ function App() {
             
             {/* Contacts Section - Fixed height with scrolling */}
             <div className="flex-1 min-h-0">
-              <div className="bg-white rounded border p-2">
-                <h3 className="text-sm font-semibold text-gray-900 mb-3">
+              <div className="glass-panel p-3">
+                <h3 className="text-sm font-semibold text-slate-100 mb-3">
                   {selectedCategory ? `${getCategoryLabel(selectedCategory as ContactCategory)} Contacts` : 'All Contacts'} ({filteredContacts.length})
                 </h3>
                 

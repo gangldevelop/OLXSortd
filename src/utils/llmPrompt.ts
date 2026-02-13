@@ -2,7 +2,9 @@ export interface BuildDraftPromptParams {
   lastEmailHtml: string;
   contactName: string;
   senderName: string;
-  language?: string;
+  daysSinceLastContact?: number;
+  contactCategory?: 'recent' | 'in_touch' | 'inactive';
+  totalEmailCount?: number;
 }
 
 export interface DraftPromptMessages {
@@ -11,129 +13,242 @@ export interface DraftPromptMessages {
   lastEmailText: string;
 }
 
+export interface ParsedDraft {
+  subject: string;
+  bodyText: string;
+  bodyHtml: string;
+}
+
 function htmlToPlainText(html: string): string {
   if (!html) return '';
 
   if (typeof window !== 'undefined' && typeof DOMParser !== 'undefined') {
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
-    
-    // Remove style, script, and head tags (they're just noise)
+
     doc.querySelectorAll('style, script, head').forEach(el => el.remove());
-    
-    // Remove Teams meeting boilerplate
+
     doc.querySelectorAll('.me-email-text, .me-email-text-secondary, [href*="teams.microsoft.com"]').forEach(el => {
       const parent = el.parentElement;
       if (parent && (el.textContent?.includes('Meeting ID') || el.textContent?.includes('Passcode') || el.textContent?.includes('Join the meeting'))) {
         parent.remove();
       }
     });
-    
-    // Get text content and clean up excessive whitespace
+
     let text = doc.body.textContent || '';
-    text = text.replace(/\r\n/g, '\n')              // normalize line breaks
-               .replace(/\n{3,}/g, '\n\n')          // max 2 consecutive newlines
-               .replace(/[ \t]+/g, ' ')             // collapse spaces
-               .replace(/\n /g, '\n')               // remove leading spaces on lines
-               .replace(/_+/g, '')                  // remove underscores (often used as separators)
+    text = text.replace(/\r\n/g, '\n')
+               .replace(/\n{3,}/g, '\n\n')
+               .replace(/[ \t]+/g, ' ')
+               .replace(/\n /g, '\n')
+               .replace(/_+/g, '')
                .trim();
-    
+
     return text;
   }
 
-  // Fallback: strip tags and clean whitespace
   return html.replace(/<[^>]+>/g, ' ')
              .replace(/\s+/g, ' ')
              .replace(/_+/g, '')
              .trim();
 }
 
-function truncateText(text: string, maxChars: number = 4000): string {
+function truncateText(text: string, maxChars: number = 2000): string {
   if (text.length <= maxChars) {
     return text;
   }
-  
-  // Take the last maxChars (most recent content is usually at the end)
-  const truncated = text.slice(-maxChars);
-  return `[...email truncated to last ${maxChars} characters...]\n\n${truncated}`;
+  return text.slice(-maxChars);
 }
 
+export function textToHtml(text: string): string {
+  if (!text) return '';
+  return text
+    .split(/\n{2,}/)
+    .map(paragraph => `<p>${paragraph.replace(/\n/g, '<br>')}</p>`)
+    .join('');
+}
+
+/**
+ * Parses raw LLM output into structured fields.
+ */
+export function parseDraftResponse(raw: string, fallbackSubject?: string): ParsedDraft {
+  let cleaned = raw
+    .replace(/[{}[\]\\]/g, '')
+    .replace(/"/g, '')
+    .trim();
+
+  let subject = '';
+  let bodyText = cleaned;
+
+  const subjectMatch = cleaned.match(/BETREFF:\s*(.+?)(?:\s*---|\n)/);
+
+  if (subjectMatch) {
+    subject = subjectMatch[1].trim();
+    const dashIndex = cleaned.indexOf('---', cleaned.indexOf('BETREFF:'));
+    if (dashIndex !== -1) {
+      bodyText = cleaned.substring(dashIndex).replace(/^-+\s*/, '').trim();
+    } else {
+      bodyText = cleaned.substring(cleaned.indexOf('\n') + 1).trim();
+    }
+  } else {
+    subject = fallbackSubject || '';
+  }
+
+  if (subject && bodyText.startsWith(subject)) {
+    bodyText = bodyText.substring(subject.length).trim();
+  }
+
+  bodyText = bodyText
+    .replace(/^---+\s*/gm, '')
+    .replace(/\\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  bodyText = structureBody(bodyText);
+
+  return {
+    subject,
+    bodyText,
+    bodyHtml: textToHtml(bodyText),
+  };
+}
+
+function structureBody(text: string): string {
+  if (text.includes('\n\n')) return text;
+
+  let s = text;
+
+  s = s.replace(
+    /((?:Sehr geehrte[r]?|Guten Tag)\s+(?:Herr|Frau)\s+[^,]+,)\s*/,
+    '$1\n\n'
+  );
+
+  s = s.replace(/\s*(Mit freundlichen Grüßen)/, '\n\n$1');
+  s = s.replace(/(Mit freundlichen Grüßen)\s+/, '$1\n');
+
+  s = s.replace(
+    /\.\s+(Zu den|Wir werden|Zur |Um |Bitte |Gerne |Zusätzlich |Darüber hinaus |Des Weiteren |Bezüglich |Zuerst |Abschluss )/g,
+    '.\n\n$1'
+  );
+
+  return s;
+}
+
+/**
+ * Determines if this is an outreach scenario based on time since last contact.
+ */
+function determineEmailContext(params: BuildDraftPromptParams): {
+  isOutreach: boolean;
+  contextNote: string;
+} {
+  const days = params.daysSinceLastContact ?? 0;
+  const category = params.contactCategory;
+
+  // Outreach scenarios: inactive category OR long time since contact
+  if (category === 'inactive' || days >= 180) {
+    return {
+      isOutreach: true,
+      contextNote: days >= 365
+        ? `ueber ein Jahr (${Math.floor(days / 30)} Monate)`
+        : days >= 180
+        ? `mehrere Monate (${Math.floor(days / 30)} Monate)`
+        : 'laengerer Zeit',
+    };
+  }
+
+  // Moderate gap: acknowledge but less formal
+  if (days >= 90 && days < 180) {
+    return {
+      isOutreach: true,
+      contextNote: 'einiger Zeit',
+    };
+  }
+
+  // Recent contact: normal reply tone
+  return {
+    isOutreach: false,
+    contextNote: '',
+  };
+}
+
+/**
+ * Single-pass draft prompt. Parse output with parseDraftResponse().
+ *
+ * Usage:
+ *   const prompt = buildDraftPrompt(params);
+ *   const raw = await callLLM(prompt.system, prompt.user);
+ *   const result = parseDraftResponse(raw);
+ *   // result = { subject, bodyText, bodyHtml }
+ */
 export function buildDraftPrompt(params: BuildDraftPromptParams): DraftPromptMessages {
-  const language = params.language || 'de';
-  const lastEmailText = truncateText(htmlToPlainText(params.lastEmailHtml), 4000);
+  const { isOutreach, contextNote } = determineEmailContext(params);
+  const maxEmailChars = isOutreach ? 1500 : 2000;
+  const lastEmailText = truncateText(htmlToPlainText(params.lastEmailHtml), maxEmailChars);
 
-  const system =
-    language === 'de'
-      ? 'Du bist ein professioneller E-Mail-Assistent für ein B2B-Software-Unternehmen. ' +
-        'Deine Aufgabe ist es, natürliche, kontextbezogene Antworten auf geschäftliche E-Mails zu verfassen. ' +
-        'Analysiere die letzte E-Mail sorgfältig und verstehe den Kontext, bevor du antwortest. ' +
-        'Schreibe kurz, präzise und professionell. Vermeide generische Standardantworten oder Verkaufsfloskeln, ' +
-        'es sei denn, die E-Mail ist eindeutig eine Verkaufsanfrage. ' +
-        'Antworte immer direkt auf den Inhalt der letzten E-Mail. ' +
-        'WICHTIG: Antworte NUR mit reinem JSON. Keine Markdown-Formatierung, keine Code-Blöcke, keine Erklärungen. Nur das JSON-Objekt.'
-      : 'You are a professional email assistant for a B2B software company. ' +
-        'Your task is to write natural, context-aware responses to business emails. ' +
-        'Carefully analyze the last email and understand the context before responding. ' +
-        'Write concisely, precisely, and professionally. Avoid generic templates or sales pitches ' +
-        'unless the email is clearly a sales inquiry. ' +
-        'Always respond directly to the content of the last email. ' +
-        'IMPORTANT: Reply with raw JSON only. No markdown formatting, no code blocks, no explanations. Just the JSON object.';
+  // Base system prompt
+  let system =
+    'Du bist ein E-Mail-Assistent eines B2B-Software-Unternehmens. ' +
+    'Schreibe an langjaehrige Bestandskunden. Tonfall: formell aber warmherzig. ' +
+    'Sie-Anrede. NUR Deutsch. Kein HTML, kein JSON, keine Sonderzeichen. ' +
+    'Regeln: ' +
+    '1. Anrede NUR mit Nachname: "Sehr geehrter Herr Mueller" oder "Sehr geehrte Frau Schmidt". Niemals Vorname verwenden. ' +
+    '2. Anrede geschlechtergerecht: "Sehr geehrter Herr" fuer Maenner, "Sehr geehrte Frau" fuer Frauen. Bei unbekanntem Geschlecht: "Guten Tag" mit Nachname. ' +
+    '3. Statt "Vielen Dank fuer Ihre Nachricht" immer "Vielen Dank fuer Ihre Anfrage" verwenden. ' +
+    '4. Niemals entschuldigen oder bedauern. Kein "Wir bedauern", kein "Es tut uns leid", kein "Entschuldigung". ' +
+    'Stattdessen positiv formulieren: "Gerne helfen wir Ihnen", "Wir kuemmern uns darum", "Wir unterstuetzen Sie gerne".';
 
-  const user =
-    language === 'de'
-      ? [
-          `Du bist "${params.senderName}" und schreibst an "${params.contactName}".`,
-          '',
-          'KONTEXT: Dies ist die letzte E-Mail in einer Konversation. Sie kann von mir stammen (ausgehend) oder vom Kontakt (eingehend).',
-          '',
-          'AUFGABE:',
-          '1. Lies die E-Mail unten sorgfältig',
-          '2. Verstehe den Kontext und das Thema',
-          '3. Wenn die E-Mail VON MIR stammt (ich habe dem Kontakt etwas erklärt/angeboten):',
-          '   - Schreibe eine kurze Nachverfolgung oder Frage nach Feedback',
-          '   - Beispiel: "Haben Sie noch Fragen dazu?" oder "Brauchen Sie weitere Informationen?"',
-          '4. Wenn die E-Mail VOM KONTAKT stammt (eine Frage/Anfrage/Kommentar an mich):',
-          '   - Beantworte die Frage oder gehe auf den Kommentar ein',
-          '   - Sei spezifisch und relevant',
-          '5. Betreffzeile sollte das Thema widerspiegeln (ohne "Re:" oder "AW:")',
-          '6. Halte die Antwort kurz und geschäftsmäßig (2-4 Absätze maximal)',
-          '',
-          'AUSGABEFORMAT - Antworte NUR mit diesem JSON (keine Markdown-Blöcke, keine Erklärungen):',
-          '{"subject":"Betreffzeile","bodyHtml":"<p>Antwort</p>","bodyText":"Antwort"}',
-          '',
-          'BEISPIEL für korrekte Antwort:',
-          '{"subject":"Lizenzanfrage OLXDisclaimer","bodyHtml":"<p>Hallo,</p><p>Inhalt hier</p><p>Grüße</p>","bodyText":"Hallo, Inhalt hier Grüße"}',
-          '',
-          '=== LETZTE E-MAIL ===',
-          lastEmailText || '(kein Inhalt verfügbar)',
-        ].join('\n')
-      : [
-          `You are "${params.senderName}" writing to "${params.contactName}".`,
-          '',
-          'CONTEXT: This is the last email in a conversation. It could be from me (outbound) or from the contact (inbound).',
-          '',
-          'TASK:',
-          '1. Read the email below carefully',
-          '2. Understand the context and topic',
-          '3. If the email is FROM ME (I explained/offered something to the contact):',
-          '   - Write a brief follow-up or ask for feedback',
-          '   - Example: "Do you have any questions?" or "Do you need more information?"',
-          '4. If the email is FROM THE CONTACT (a question/request/comment to me):',
-          '   - Answer the question or address the comment',
-          '   - Be specific and relevant',
-          '5. Subject line should reflect the topic (without "Re:" prefix)',
-          '6. Keep the response short and business-like (2-4 paragraphs max)',
-          '',
-          'OUTPUT FORMAT - Reply with ONLY this JSON (no markdown blocks, no explanations):',
-          '{"subject":"Subject line","bodyHtml":"<p>Response</p>","bodyText":"Response"}',
-          '',
-          'EXAMPLE of correct response:',
-          '{"subject":"License inquiry","bodyHtml":"<p>Hello,</p><p>Content here</p><p>Regards</p>","bodyText":"Hello, Content here Regards"}',
-          '',
-          '=== LAST EMAIL ===',
-          lastEmailText || '(no content available)',
-        ].join('\n');
+  // Add outreach-specific guidance
+  if (isOutreach) {
+    system +=
+      ' ' +
+      'OUTREACH-KONTEXT: ' +
+      `Letzter Kontakt vor ${contextNote}. Dies ist eine Wiederaufnahme-E-Mail. ` +
+      'Outreach-Regeln: ' +
+      '5. Beginne mit freundlicher Anerkennung der vergangenen Zeit. ' +
+      'Z.B.: "es ist eine Weile her seit unserem letzten Austausch" oder "ich melde mich wieder bei Ihnen". ' +
+      '6. Zeige Interesse an der aktuellen Situation des Kunden. Frage nach aktuellen Projekten oder Herausforderungen. ' +
+      '7. Falls die letzte E-Mail Themen enthielt, beziehe dich kurz darauf aber erkenne an dass sich die Situation geaendert haben koennte. ' +
+      '8. Biete proaktiv Unterstuetzung oder Updates zu relevanten Produkten an. ' +
+      '9. Tonfall: freundlich, respektvoll, nicht aufdringlich. Kein "Wir vermissen Sie" oder uebertrieben emotionale Formulierungen.';
+  }
+
+  // Build user prompt
+  const userPromptParts = [
+    `Von: "${params.senderName}" An: "${params.contactName}"`,
+    '',
+  ];
+
+  if (isOutreach) {
+    userPromptParts.push(
+      `KONTEXT: Letzter Kontakt vor ${contextNote}. Dies ist eine OUTREACH-E-Mail.`,
+      'Schreibe eine proaktive Wiederaufnahme-E-Mail die:',
+      '- Die Zeitspanne seit dem letzten Kontakt anerkennt',
+      '- Bezug auf die letzte E-Mail nimmt falls relevant',
+      '- Interesse an der aktuellen Situation des Kunden zeigt',
+      '- Wert und Unterstuetzung anbietet',
+      '',
+    );
+  } else {
+    userPromptParts.push(
+      'Beantworte die E-Mail unten. Identifiziere jede Frage und beantworte sie konkret.',
+      'Wenn du die Antwort nicht kennst, bestaetige die Frage und sage zu dich darum zu kuemmern.',
+      '',
+    );
+  }
+
+  userPromptParts.push(
+    'Format:',
+    'BETREFF: (Betreffzeile)',
+    '---',
+    '(E-Mail mit Absaetzen)',
+    '',
+    `Grussformel: "Mit freundlichen Gruessen" dann "${params.senderName}"`,
+    '',
+    '--- E-MAIL ---',
+    lastEmailText || '(kein Inhalt)',
+    '--- ENDE ---',
+  );
+
+  const user = userPromptParts.join('\n');
 
   return { system, user, lastEmailText };
 }
-
