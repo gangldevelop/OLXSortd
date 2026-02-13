@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0" xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="MailApp">
   <Id>a7b3c9d2-5f8e-4a1b-9c3d-7e6f8a9b2c4d</Id>
-  <Version>0.0.0.1</Version>
+  <Version>1.0.0.0</Version>
   <ProviderName>OLXOutreach</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="OLXOutreach - Email Contact Manager" />
   <Description DefaultValue="Manage your email contacts, analyze communication patterns, and send follow-up emails efficiently." />
-  <IconUrl DefaultValue="https://portsmouth-hereby-fibre-gotta.trycloudflare.com/vite.svg"/>
-  <HighResolutionIconUrl DefaultValue="https://portsmouth-hereby-fibre-gotta.trycloudflare.com/vite.svg"/>
+  <IconUrl DefaultValue="https://portsmouth-hereby-fibre-gotta.trycloudflare.com/icon.png"/>
+  <HighResolutionIconUrl DefaultValue="https://portsmouth-hereby-fibre-gotta.trycloudflare.com/icon.png"/>
   <SupportUrl DefaultValue="https://portsmouth-hereby-fibre-gotta.trycloudflare.com/"/>
   <AppDomains>
     <AppDomain>https://portsmouth-hereby-fibre-gotta.trycloudflare.com</AppDomain>
@@ -69,9 +69,9 @@
     </Hosts>
     <Resources>
       <bt:Images>
-        <bt:Image id="icon-16" DefaultValue="https://portsmouth-hereby-fibre-gotta.trycloudflare.com/vite.svg" />
-        <bt:Image id="icon-32" DefaultValue="https://portsmouth-hereby-fibre-gotta.trycloudflare.com/vite.svg" />
-        <bt:Image id="icon-80" DefaultValue="https://portsmouth-hereby-fibre-gotta.trycloudflare.com/vite.svg" />
+        <bt:Image id="icon-16" DefaultValue="https://portsmouth-hereby-fibre-gotta.trycloudflare.com/icon-16.png" />
+        <bt:Image id="icon-32" DefaultValue="https://portsmouth-hereby-fibre-gotta.trycloudflare.com/icon-32.png" />
+        <bt:Image id="icon-80" DefaultValue="https://portsmouth-hereby-fibre-gotta.trycloudflare.com/icon-80.png" />
       </bt:Images>
       <bt:Urls>
         <bt:Url id="functionFile" DefaultValue="https://portsmouth-hereby-fibre-gotta.trycloudflare.com/" />
